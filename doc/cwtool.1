@@ -236,7 +236,7 @@ Allows access to or creation of D64 and G64 image files. For example
 .Vb
 \&\fBc1541\fR \-format test,00 g64 /tmp/test.g64
 .Ve
-creates an G64 empty image file. Later on you may add files to it.
+creates a G64 empty image file. Later on you may add files to it.
 
 .IP "imgtool (part of MESS), http://www.mess.org/" 8
 Imgtool is a tool for the maintenance and manipulation of disk and other types of images that MESS users need to deal with. Functions include retrieving and storing files and CRC checking/validation. It supports many different image formats.
@@ -263,7 +263,7 @@ Assume your 360K drive is on /dev/cw0raw0, then try the following (yes the line 
 \&\fBcwtool\fR \-I \-e 'drive \*(Q"/dev/cw0raw0\*(Q"
 \&    { inverted_diskchange yes double_step yes }'
 .Ve
-Those drives seem to give an inverted diskchange\-signal and work with 300 rpm instead of 360 rpm like the 1.2M ones. My 360K drive also reads data if no index pulse is present, so you do not need to modify such drives, just use the following command to configure the driver accordingly (yes the line break is ok, but you may also write it in one line):
+Those drives seem to give an inverted diskchange\-signal and work with 300 RPM instead of 360 RPM like the 1.2M ones. My 360K drive also reads data if no index pulse is present, so you do not need to modify such drives, just use the following command to configure the driver accordingly (yes the line break is ok, but you may also write it in one line):
 
 .Vb
 \&\fBcwtool\fR \-I \-e 'drive \*(Q"/dev/cw0raw0\*(Q"
@@ -275,7 +275,32 @@ This instructs the driver to not check if an index pulse is present or not. But 
 \&\fBcwtool\fR \-R \-v c1541_300 /dev/cw0raw0 image.d64
 \&\fBcwtool\fR \-R \-v mac_5.25_300 /dev/cw0raw0 image.bin
 .Ve
-As mentioned above 360K drives operate with 300 rpm instead of 360 rpm like the 1.2M ones, so you need to use different disk configurations.
+As mentioned above 360K drives operate with 300 RPM instead of 360 RPM like the 1.2M ones, so you need to use different disk configurations.
+
+.IP "5.25\*(Q" DD and HD disks" 8
+Levente Harsfalvi made a detailed analysis of 5.25\*(Q" DD and HD disks. Here his results:
+
+\*(Q"... There is a significant difference between 5.25\*(Q" DD and HD media, which is basically due to the different materials the magnetic layers of the disks are made of. DD 5.25\*(Q" coatings are composed of ferric oxides. HD 5.25\*(Q" is made of Cobalt compounds. The signal \*(Q"density\*(Q", signal cutoff frequency, provided by HD, is much higher than that of DD (bringing in significant frequency characteristics differences). Magnetic coercivity (magnetic \*(Q"toughness\*(Q", that is, the \*(Q"strength\*(Q" of magnetic flux required to flip magnetic domains) of HD is also much higher, it is about two times that of DD. Handling both DD and HD disks in the same floppy drive needs dedicated parameter sets to be used for DD and HD (that is to say, all HD drives are basically dual standard drives). These \*(Q"sets\*(Q" themself are physical parameters in the drives, which need to be selected for the respective media type using a \*(Q"density setting\*(Q" flag. This density setting flag affects three parameters, specifically: writing current, read signal shaping filter response characteristics, and the length of the shortest valid readable pulse.
+
+3.5\*(Q" HD drives select density setting automatically (that is, they check the media indicator hole of the disk, and set the density flag accordingly). 5.25\*(Q" drives have no means to do that, correct density setting needs to be provided by host.
+
+cw defaults to high density setting. To select low density, execute:
+
+.Vb
+\&\fBcwtool\fR \-I \-e 'drive \*(Q"/dev/cw0raw0\*(Q" { density on }'
+.Ve
+To get back to high density setting, execute:
+
+.Vb
+\&\fBcwtool\fR \-I \-e 'drive \*(Q"/dev/cw0raw0\*(Q" { density off }'
+.Ve
+Density can be set anytime. The last setting persists as long as the cw module is kept loaded.
+
+In practice, high density setting usually works for both DD and HD media (strictly speaking of 5.25\*(Q"; 3.5\*(Q" would be different). For HD disks, this is just the expected behaviour. Handling DD in default HD mode rather works \*(Q"by accident\*(Q" (that is, because of a couple of fortunate factors). Writing data works because the magnetic layer gets saturated during write operations anyway; whether it's done by some much higher magnetic flux than usual, doesn't really matter. Reading data also works most of the time because the cutoff frequency and overall frequency response of DD read signals are usually pretty limited just by themself, \*(Q"by design\*(Q", that is, they appear almost as if they were already fed through the low density shaping filter. This might depend on disk, recording, aging, drive etc. Your mileage may vary.
+
+There's no such \*(Q"fortunate situation\*(Q" for HD media. Standard HD can only ever be handled (that is, without major problems) in high density setting.
+
+From a technical point of view, for DD media, low density should be selected \- to be correct, and to be on the safe side. ...\*(Q"
 
 .IP "3.5\*(Q" DD and HD disks" 8
 There is a difference between 3.5\*(Q" HD and DD disks, especially when HD disks are written in a DD drive, below is an explanation shamelessly stolen from Michael Krause's cwfloppy README:
@@ -291,8 +316,8 @@ However, if you insert an HD disk formatted in DD format into an HD drive, you H
 So, if somebody gives you a disk with an HD hole and you can not mount it as either Amiga HD or MS\-DOS HD, it could be a perfectly fine DD formatted disk \-\- only your drive is in the wrong mode to read it without errors, because it detects the uncovered HD hole and thinks it is in HD format. Cover the hole with some piece of tape, and everything will be fine. ...\*(Q"
 
 .SH SOME BACKGROUND INFORMATION
-.IP "Some basics (shamelessly stolen from Wikipedia)" 8
-\*(Q"... A floppy disk is a data storage medium that is composed of a disk of thin, flexible (\*(Q"floppy\*(Q") magnetic storage medium encased in a square or rectangular plastic shell. Floppy disks are read and written by a floppy disk drive. Invented by IBM, floppy disks in 8\*(Q" (200 mm), 5.25\*(Q" (133.3 mm), and the newest and most common 3.5\*(Q" (90 mm) formats enjoyed many years as a popular and ubiquitous form of data storage and exchange from the mid\-1970s to the late 1990s.
+.IP "Some basics" 8
+(shamelessly stolen from Wikipedia) \*(Q"... A floppy disk is a data storage medium that is composed of a disk of thin, flexible (\*(Q"floppy\*(Q") magnetic storage medium encased in a square or rectangular plastic shell. Floppy disks are read and written by a floppy disk drive. Invented by IBM, floppy disks in 8\*(Q" (200 mm), 5.25\*(Q" (133.3 mm), and the newest and most common 3.5\*(Q" (90 mm) formats enjoyed many years as a popular and ubiquitous form of data storage and exchange from the mid\-1970s to the late 1990s.
 
 The 5.25\*(Q" disk had a large circular hole in the center for the spindle of the drive and a small oval aperture in both sides of the plastic to allow the heads of the drive to read and write the data. The magnetic medium could be spun by rotating it from the middle hole. A small notch on the right hand side of the disk would identify whether the disk was read\-only or writable, detected by a mechanical switch or photo transistor above it. Another LED/phototransistor pair located near the center of the disk could detect a small hole once per rotation, called the index hole, in the magnetic disk. It was used to detect the start of each track, and whether or not the disk rotated at the correct speed; some operating systems, such as Apple DOS, did not use index sync, and often the drives designed for such systems lacked the index hole sensor. Disks of this type were said to be soft sector disks. Very early 8\*(Q" and 5.25\*(Q" disks also had physical holes for each sector, and were termed hard sector disks. Inside the disk were two layers of fabric designed to reduce friction between the medium and the outer casing, with the medium sandwiched in the middle. The outer casing was usually a one\-part sheet, folded double with flaps glued or spot\-welded together. A catch was lowered into position in front of the drive to prevent the disk from emerging, as well as to raise or lower the spindle (and, in two\-sided drives, the upper read/write head).
 
@@ -313,10 +338,10 @@ Data is written as a serial stream to the floppy disk. But the 0's and 1's are n
 \&\-+  +\-\-\-\-\-\-\-\-+
 \& 1  1  0  0  1  0
 .Ve
-But this causes trouble if long sequences of 0's occur, because the rotation speed of a drive is not perfectly constant. Furthermore it may vary a little bit from drive to drive. So there is some other encoding method needed to limit the maximum length of consecutive 0's (which means limiting the maximum length of a flux change).
+But this causes trouble if long sequences of 0's occur, because the rotational speed of a drive is not perfectly constant. Furthermore the average rotational speed may vary a little bit from one drive to another. Usually a deviation of \-/+2.5% is allowed. So there is some other encoding method needed to limit the maximum length of consecutive 0's (which means limiting the maximum length from one flux change to another).
 
-.IP "FM \- Frequency Modulation" 8
-With FM every data bit is preceded by a clock bit. This means if you want to write four data bits, FM will add four clock bits (= eight bits in total). The added clock bits are always 1. For example the data bits 1001 will result in the FM stream 1110 1011 (first bit is a clock bit). Because every clock bit is 1 the maximum length of consecutive 0's is one.
+.IP "FM \- Frequency Modulation (also called Miller code)" 8
+With FM every data bit is preceded by a clock bit. This means if you want to write four data bits, FM will add four clock bits (this results in eight bits in total). The added clock bits are always 1. For example the data bits 1001 will result in the FM stream 1110 1011 (first bit is a clock bit). Because every clock bit is 1 the maximum length of consecutive 0's is one.
 
 .Vb
 \&      +\-\-+  +\-\-\-\-\-+     +\-\-+
@@ -328,7 +353,7 @@ With FM every data bit is preceded by a clock bit. This means if you want to wri
 \&Data     1     0     0     1
 .Ve
 .IP "MFM \- Modified FM" 8
-The rate of the flux change is also a limiting factor to disk capacity. If a coding method is able to guarantee slower flux changes one can increase capacity. MFM is a modified version of FM. It does not always set the clock bits to 1. Instead it looks also at the data bits to decide which value the clock bit will be set to. Only if the preceding and the following data bit is 0 the clock bit will be 1, otherwise it is 0. If you want to write the seven data bits 110 0101, the resulting MFM stream is 01 0100 1001 0001. The shortest flux change in MFM is twice as long as in FM. So you may double your capacity with MFM in comparsion to FM. The maximum length of consecutive 0's is three.
+The rate of the flux change is also a limiting factor to disk capacity. If a coding method is able to guarantee slower flux changes one can increase capacity. MFM is a modified version of FM. It does not always set the clock bits to 1. Instead it looks also at the data bits to decide which value the clock bit will be set to. Only if the preceding and the following data bit are 0 the clock bit will be 1, otherwise it is 0. If you want to write the seven data bits 110 0101, the resulting MFM stream is 01 0100 1001 0001. The shortest flux change in MFM is twice as long as in FM. So you may double your capacity with MFM in comparison to FM. The maximum length of consecutive 0's is three.
 
 .Vb
 \&     \-\-\-\-+     +\-\-\-\-\-\-\-\-+        +\-\-\-\-\-\-\-\-\-\-\-+
@@ -339,14 +364,14 @@ The rate of the flux change is also a limiting factor to disk capacity. If a cod
 \&Clock 0     0     0     1     0     0     0
 \&Data     1     1     0     0     1     0     1
 .Ve
-.IP "M2FM, MMFM \- Modified MFM (currently not implemented in \fBcwtool\fR)" 8
-The rule for the clock bits is modified again in M2FM. A clock bit in MFM is only 1 if two consecutive data bits are 0. In M2FM additionally the preceding clock bit has to be 0 for the current clock bit to be 1. The eight data bits 1101 0001 would result in the M2FM stream 0101 0001 0010 0001. The maximum length of consecutive 0's is four. The length of the shortest flux change is unchanged compared to MFM.
+.IP "MMFM, M2FM \- Modified MFM" 8
+The rule for the clock bits is modified again in MMFM. A clock bit in MFM is only 1 if two consecutive data bits are 0. In MMFM additionally the preceding clock bit has to be 0 for the current clock bit to be 1. The eight data bits 1101 0001 would result in the MMFM stream 0101 0001 0010 0001. The maximum length of consecutive 0's is four. The length of the shortest flux change is unchanged compared to MFM.
 
 .Vb
 \&     \-\-\-\-+     +\-\-\-\-\-\-\-\-\-\-\-+        +\-\-\-\-\-\-\-\-\-\-\-\-\-\-+
 \&         |     |           |        |              |
 \&         +\-\-\-\-\-+           +\-\-\-\-\-\-\-\-+              +\-
-\&M2FM  0  1  0  1  0  0  0  1  0  0  1  0  0  0  0  1
+\&MMFM  0  1  0  1  0  0  0  1  0  0  1  0  0  0  0  1
 \&
 \&Clock 0     0     0     0     0     1     0     0
 \&Data     1     1     0     1     0     0     0     1
@@ -393,14 +418,14 @@ Instead of interweaving a clock signal with the data like done in FM and MFM, GC
 \&   1111   |    10101
 .Ve
 .IP "SYNC\-Marker, Sector Header, Data Header" 8
-SYNC Markers are used to find the beginning of a sector (for soft sector disks). Those Markers use bit patterns not occuring in valid encoded data. For example with 4\-to\-5 GCR encoding it is not possible to generate a sequence of ten consecutive 1's. With FM encoding it is not possible to generate the pattern 1111 0101 0111 1110, because some clock bits are 0 here. But this sequence does not violate the limits of the shortest and longest flux change for FM, so it will not cause problems, when written to disk. Same for MFM with the pattern 0100 0100 1000 1001. Shortest and longest flux change are within MFM limits, but one clock bit is wrong.
+SYNC Markers are used to find the beginning of a sector (for soft sectored disks). Those Markers use bit patterns not occurring in valid encoded data. For example with 4\-to\-5 GCR encoding it is not possible to generate a sequence of ten consecutive 1's. With FM encoding it is not possible to generate the pattern 1111 0101 0111 1110, because some clock bits are 0 here. But this sequence does not violate the limits of the shortest and longest flux change for FM, so it will not cause problems, when written to disk. Same for MFM with the pattern 0100 0100 1000 1001. Shortest and longest flux change are within MFM limits, but one clock bit is wrong.
 
 A sector header usually starts with a SYNC\-Marker followed by the track and sector number and a checksum. Some formats directly append the data payload after that (Amiga). Others use a separate data header with its own SYNC\-Marker for the data (C1541). This has to do with the ability to write a whole track at once. If this is not possible, the usual strategy is to first search the sector to be overwritten. If the sector header was found, the floppy drive is switched to write mode immediately and the data with its own SYNC\-Marker is written to disk.
 
 .IP "How the Catweasel controller reads a floppy disk" 8
-The Catweasel controller just measures the time between flux changes. Whenever a flux change occurs a 7 bit counter is started to count up the clock cycles until the next flux change is detected. Then the value of the counter is saved and it is reset to start the procedure again. The Catweasel controller uses built memory to store the counter values. There are three different clock frequencies the counter may use: 14.161 MHz, 28.322 MHz and 56.644 MHz. Because you have to ensure, that no counter overflow occurs, one can not freely choose a clock frequency. Usually DD floppies are read with 14.161 MHz while HD floppies are read with 28.322 MHz.
+The Catweasel controller just measures the time between flux changes. Whenever a flux change occurs a 7 bit counter is started to count up the clock cycles until the next flux change is detected. Then the value of the counter is saved and it is reset to start the procedure again. The Catweasel controller uses built memory to store the counter values. There are three different clock frequencies the counter may use: 14.161 MHz, 28.322 MHz and 56.644 MHz. A side note: the counter does not count up at the full rate of the selected clock frequency, instead it counts up at the half rate. Because you have to ensure, that no counter overflow occurs, one can not freely choose a clock frequency. Usually DD floppies are read with 14.161 MHz while HD floppies are read with 28.322 MHz.
 
-If you look at the histogram of a formatted disk you should see some peaks in it. For example the track histograms of an Amiga formatted DD floppy looks like below, when using the shown command. The histogram shows how many times a certain counter value occured. In this case the histogram is shrinked a little bit for space reasons: you see the sum of two counter values. For example the values 0x1a and 0x1b are occuring about 45000 times in sum.
+If you look at the histogram of a formatted disk you should see some peaks in it. For example the track histograms of an Amiga formatted DD floppy looks like below, when using the shown command. The histogram shows how many times a certain counter value occurred. In this case the histogram is shrinked a little bit for space reasons: you see the sum of two counter values. For example the values 0x1a and 0x1b are occurring about 45000 times in sum.
 
 .Vb
 \&\fBcwtool\fR \-S amiga_dd \fI<device>\fR
@@ -441,9 +466,9 @@ The number of peaks depends on the used encoding method. Each peak corresponds t
 \&RLL 2.7    |        6        | 001, 0001, 00001, 000001,
 \&           |                 | 0000001, 00000001
 .Ve
-The Catweasel controller has 128 KByte builtin memory (MK3, MK4, MK4+). This is enough to read or write a track of a DD or HD disk at once. It is not enough for ED disks. So you won't find support for ED formats in \fBcwtool\fR currently.
+The Catweasel controller has 128 KByte builtin memory (MK1, MK2, MK3, MK4, MK4+). This is enough to read or write a track of a DD or HD disk at once. It is not enough for ED disks. So you won't find support for ED formats in \fBcwtool\fR currently.
 
-Because of the high clock frequency of the counter, the Catweasel controller is able to read and write disks intended for non CAV drives (like Apple). Likewise it is also no problem to read or write disks in 360 RPM drives which where intended for 300 RPM drives.
+Because of the high clock frequency of the counter, the Catweasel controller is able to read and write disks intended for non CAV drives (like Apple). Likewise it is also no problem to read or write disks in 360 RPM drives which were intended for 300 RPM drives.
 
 .SH AUTHOR
 Karsten Scheibler

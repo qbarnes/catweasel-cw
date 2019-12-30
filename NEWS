@@ -1,3 +1,7 @@
+cw 0.13-20130306
+	* man page: added information about the difference between 5.25" DD
+	  and HD disks (thanks to Levente Harsfalvi)
+
 cw 0.13-20121202
 	* kernel driver: added support for the MK2 Anniversary Edition taken
 	  from https://github.com/ezrec/cw/ (thanks to Jason McMullan).
