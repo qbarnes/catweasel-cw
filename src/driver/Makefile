@@ -25,9 +25,9 @@ LN=ln -f
 all:
 	if [ "${VERSION}" = "26" ]; then ${MAKE} linux26; else ${MAKE} linux24; fi
 
-linux24: ${TARGET24}
+linux24: cwfirmware.c ${TARGET24}
 
-linux26: cwmain.c cwfirmware.c
+linux26: cwfirmware.c cwmain.c
 	CW_DIR=${CWD} ${MAKE} -C ${KERNEL_DIR} M=${CWD} modules && ${CP} cw.ko ${TARGET26}
 
 # Linux 2.6 will create a cw.o containing all *.o files this will conflict
@@ -45,7 +45,7 @@ cwmain.c:
 %.o: %.c
 	${CC} -c -o $@ $<
 
-${TARGET24}: ${OBJECTS} cwfirmware.c
+${TARGET24}: ${OBJECTS}
 	${LD} -o ${TARGET24} ${OBJECTS}
 
 clean:

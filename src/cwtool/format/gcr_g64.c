@@ -434,20 +434,21 @@ gcr_g64_write_track(
 #define MAGIC_STRIP_TRACK		1
 #define MAGIC_ALIGN_TRACK		2
 #define MAGIC_POSTCOMP			3
-#define MAGIC_PAD_LENGTH1		4
-#define MAGIC_PAD_LENGTH2		5
-#define MAGIC_HEADER_RAW_ID		6
-#define MAGIC_SPEED			7
-#define MAGIC_PROLOG_LENGTH		8
-#define MAGIC_EPILOG_LENGTH		9
-#define MAGIC_PRECOMP0			10
-#define MAGIC_PRECOMP1			11
-#define MAGIC_PRECOMP2			12
-#define MAGIC_PRECOMP3			13
-#define MAGIC_BOUNDS0			14
-#define MAGIC_BOUNDS1			15
-#define MAGIC_BOUNDS2			16
-#define MAGIC_BOUNDS3			17
+#define MAGIC_SYNC_LENGTH		4
+#define MAGIC_PAD_LENGTH1		5
+#define MAGIC_PAD_LENGTH2		6
+#define MAGIC_HEADER_RAW_ID		7
+#define MAGIC_SPEED			8
+#define MAGIC_PROLOG_LENGTH		9
+#define MAGIC_EPILOG_LENGTH		10
+#define MAGIC_PRECOMP0			11
+#define MAGIC_PRECOMP1			12
+#define MAGIC_PRECOMP2			13
+#define MAGIC_PRECOMP3			14
+#define MAGIC_BOUNDS0			15
+#define MAGIC_BOUNDS1			16
+#define MAGIC_BOUNDS2			17
+#define MAGIC_BOUNDS3			18
 
 
 
@@ -529,6 +530,7 @@ gcr_g64_set_read_option(
 	if (magic == MAGIC_STRIP_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_STRIP_TRACK));
 	if (magic == MAGIC_ALIGN_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_ALIGN_TRACK));
 	if (magic == MAGIC_POSTCOMP)      return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_POSTCOMP));
+	if (magic == MAGIC_SYNC_LENGTH)   return (setvalue_uchar(&fmt->gcr_g64.rd.sync_length, val, 9, 0xff));
 	if (magic == MAGIC_PAD_LENGTH1)   return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length1, val, 0, 0xff));
 	if (magic == MAGIC_PAD_LENGTH2)   return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length2, val, 0, 0xff));
 	if (magic == MAGIC_HEADER_RAW_ID) return (setvalue_uchar(&fmt->gcr_g64.rd.header_raw_id, val, 0, 0xff));
@@ -632,6 +634,7 @@ static struct format_option		gcr_g64_read_options[] =
 	FORMAT_OPTION_BOOLEAN("strip_track",   MAGIC_STRIP_TRACK,   1),
 	FORMAT_OPTION_BOOLEAN("align_track",   MAGIC_ALIGN_TRACK,   1),
 	FORMAT_OPTION_BOOLEAN("postcomp",      MAGIC_POSTCOMP,      1),
+	FORMAT_OPTION_INTEGER("sync_length",   MAGIC_SYNC_LENGTH,   1),
 	FORMAT_OPTION_INTEGER("pad_length1",   MAGIC_PAD_LENGTH1,   1),
 	FORMAT_OPTION_INTEGER("pad_length2",   MAGIC_PAD_LENGTH2,   1),
 	FORMAT_OPTION_INTEGER("header_raw_id", MAGIC_HEADER_RAW_ID, 1),

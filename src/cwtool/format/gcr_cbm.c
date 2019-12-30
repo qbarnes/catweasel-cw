@@ -203,16 +203,17 @@ gcr_write_bytes(
 
 
 
-#define HEADER_SIZE			8
-#define DATA_SIZE			260
-
 /*
- * while reading just ignore the last two bytes of sector data, because we
- * don't really need them. this will prevent sectors to be classified as
- * erroneous, which just have problems with the last two bytes but are
- * otherwise ok
+ * while reading just ignore the last two bytes of sector and header data,
+ * because we don't really need them. this will prevent sectors to be
+ * classified as erroneous, which just have problems with the last two
+ * bytes but are otherwise ok
  */
 
+#define HEADER_SIZE			8
+#define HEADER_READ_SIZE		(HEADER_SIZE - 2)
+#define HEADER_WRITE_SIZE		HEADER_SIZE
+#define DATA_SIZE			260
 #define DATA_READ_SIZE			(DATA_SIZE - 2)
 #define DATA_WRITE_SIZE			DATA_SIZE
 #define FLAG_IGNORE_CHECKSUMS		(1 << 0)
@@ -272,7 +273,7 @@ gcr_cbm_read_sector2(
 		*dsk_err = (struct disk_error) { };
 		if (gcr_read_sync(ffo_l1, gcr_cbm->rd.sync_length) == -1) return (-1);
 		bitofs = fifo_get_rd_bitofs(ffo_l1);
-		if (gcr_read_bytes(ffo_l1, dsk_err, header, HEADER_SIZE) == -1) return (-1);
+		if (gcr_read_bytes(ffo_l1, dsk_err, header, HEADER_READ_SIZE) == -1) return (-1);
 		fifo_set_rd_bitofs(ffo_l1, bitofs);
 		if (format_compare2("header_id: got 0x%02x, expected 0x%02x", header[0], gcr_cbm->rw.header_id) == 0) break;
 		}
@@ -298,7 +299,7 @@ gcr_cbm_write_sector2(
 	{
 	if (gcr_write_fill(ffo_l1, gcr_cbm->wr.fill_value, gcr_cbm->wr.fill_length) == -1) return (-1);
 	if (gcr_write_sync(ffo_l1, gcr_cbm->wr.sync_length) == -1) return (-1);
-	if (gcr_write_bytes(ffo_l1, header, HEADER_SIZE) == -1) return (-1);
+	if (gcr_write_bytes(ffo_l1, header, HEADER_WRITE_SIZE) == -1) return (-1);
 	if (gcr_write_fill(ffo_l1, gcr_cbm->wr.fill_value, gcr_cbm->wr.fill_length) == -1) return (-1);
 	if (gcr_write_sync(ffo_l1, gcr_cbm->wr.sync_length) == -1) return (-1);
 	if (gcr_write_bytes(ffo_l1, data, DATA_WRITE_SIZE) == -1) return (-1);
@@ -338,8 +339,8 @@ gcr_cbm_read_sector(
 
 	/* check sector quality */
 
-	result = format_compare2("header xor checksum: got 0x%02x, expected 0x%02x", header[1], gcr_cbm_checksum(&header[2], 6));
-	result += format_compare2("data xor checksum: got 0x%02x, expected 0x%02x", data[257], gcr_cbm_checksum(&data[1], 256));
+	result = format_compare2("header xor checksum: got 0x%02x, expected 0x%02x", header[1], gcr_cbm_checksum(&header[2], HEADER_READ_SIZE - 2));
+	result += format_compare2("data xor checksum: got 0x%02x, expected 0x%02x", data[257], gcr_cbm_checksum(&data[1], DATA_READ_SIZE - 2));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
 	if (gcr_cbm->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);

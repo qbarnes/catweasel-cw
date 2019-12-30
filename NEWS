@@ -1,3 +1,9 @@
+cw 0.12.2-20070324
+	* corrected track ranges in configurations for ibm_dsdd and dg_dsdd
+	* lowered needed sync_length for various c1541 configurations
+	* adjusted Makefile of the driver to fix compilation problems under
+	  Linux 2.4
+
 cw 0.12.1-20070319
 	* slightly changed configuration for mac_dd_800 and mac_dd_800_524
 	* enabled post compensation in all disk configurations. this should
