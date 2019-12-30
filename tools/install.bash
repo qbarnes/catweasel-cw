@@ -174,14 +174,19 @@ modify_modprobe_d()
 		return
 	fi
 	if [ -e "$MODULES_CONF/catweasel" ]; then
-		echo "file '$MODULES_CONF/catweasel' already exists" 1>&2
+		echo "renaming '$MODULES_CONF/catweasel' to '$MODULES_CONF/catweasel.conf'"
+		mv "$MODULES_CONF/catweasel" "$MODULES_CONF/catweasel.conf"
+	fi
+	if [ -e "$MODULES_CONF/catweasel.conf" ]; then
+		echo "file '$MODULES_CONF/catweasel.conf' already exists" 1>&2
 		exit 1
 	fi
-	echo "adding entries to '$MODULES_CONF/catweasel'"
+	echo "adding entries to '$MODULES_CONF/catweasel.conf'"
 	{
+	echo "# used by the driver for cwtool"
 	echo "alias char-major-$MAJOR $MODULE_NAME"
 	echo "options $MODULE_NAME cw_major=$MAJOR"
-	} > "$MODULES_CONF/catweasel"
+	} > "$MODULES_CONF/catweasel.conf"
 	}
 
 
@@ -195,7 +200,7 @@ cleanup_modprobe_d()
 		echo "directory '$MODULES_CONF' not found"
 		return
 	fi
-	rm -f "$MODULES_CONF/catweasel"
+	rm -f "$MODULES_CONF/catweasel.conf"
 	}
 
 
@@ -404,7 +409,7 @@ elif [ "$PROGRAM_NAME" = "uninstall.bash" ]; then
 	remove_device_nodes "/etc/udev/devices"
 	cleanup_static_devices
 else
-	echo "unknown program name '$PROGRAM_NAME'" 2>&1
+	echo "unknown program name '$PROGRAM_NAME'" 1>&2
 fi
 exit 0
 ######################################################### Karsten Scheibler #

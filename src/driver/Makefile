@@ -30,7 +30,7 @@ LD:=ld -r -s
 .PHONY: all linux24 linux26 clean
 
 all:
-	if [ "${VERSION}" = "26" ]; then ${MAKE} linux26; else ${MAKE} linux24; fi
+	if [ ${VERSION} -ge 26 ]; then ${MAKE} linux26; else ${MAKE} linux24; fi
 
 linux24: config.h firmware.c ${TARGET24}
 
@@ -50,6 +50,6 @@ ${TARGET24}: ${OBJECTS}
 	${LD} -o ${TARGET24} ${OBJECTS}
 
 clean:
-	if [ "${VERSION}" = "26" ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
+	if [ ${VERSION} -ge 26 ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
 	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} ${BUILD_BIN_DIR}/fwdump config.h firmware.c *~ *.bak *.ko Module.symvers Modules.symvers Module.markers modules.order
 endif

@@ -1,3 +1,9 @@
+cw 0.13-20120623
+	* kernel driver: compile time fixes for Linux 3.0+ (thanks to
+	  Dennis Boone)
+	* kernel driver: compile time fixes for Linux 2.6.38+ (thanks to
+	  Adrian Glaubitz)
+
 cw 0.13-20090511
 	* included cwio as interface to the kernel driver for other programs
 	* included new FPGA firmware for MK4 cards

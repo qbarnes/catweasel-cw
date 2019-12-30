@@ -165,41 +165,43 @@ a look at the src/cwio directory.
 
 There are at least 6 other Linux drivers for the Catweasel controller:
 
-catweasel (*) - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
-	Linux driver for SID, Joysticks and Amiga keyboard. If you also want
-	to use this package together with cw, remember to set MODULE_NAME to
-	a different name, because catweasel uses the same name for the driver
-	module (see the installation instructions in [3]).
+catweasel (*) - http://llg.cubic.org/cw/
+	Written by Dirk Jagdmann. A Linux driver for SID, Joysticks and Amiga
+	keyboard. If you also want to use this package together with cw,
+	remember to set MODULE_NAME to a different name, because catweasel
+	uses the same name for the driver module (see the installation
+	instructions in [3]).
 
-cwfloppy (*) - http://www.soundtracker.org/raw/cwfloppy/, written by
-	Michael Krause. A Linux driver for accessing the floppies on a
-	Catweasel controller. This driver exports block devices, so you are
-	able to mount Amiga disks under Linux. Currently it supports Amiga
-	and MSDOS disks (and C1541 with a patch written by me). To support
-	more formats i found it more useful to use another method to export
-	data to user space, thats why i started my own driver. Instead of a
-	block device cw uses a char device and passes the raw Catweasel data
-	to the calling program, so all format routines do not reside in the
-	kernel driver anymore.
+cwfloppy (*) - http://www.soundtracker.org/raw/cwfloppy/
+	Written by Michael Krause. A Linux driver for accessing the floppies
+	on a Catweasel controller. This driver exports block devices, so you
+	are able to mount Amiga disks under Linux. Currently it supports
+	Amiga and MSDOS disks (and C1541 with a patch written by me). To
+	support more formats i found it more useful to use another method to
+	export data to user space, thats why i started my own driver. Instead
+	of a block device cw uses a char device and passes the raw Catweasel
+	data to the calling program, so all format routines do not reside in
+	the kernel driver anymore.
 
-hardsid (*) - http://hardsid.sourceforge.net/, written by Jarno Paananen
-	and Simon White. A Linux driver for the Hardsidcards and the
-	SID-Chips on Catweasel MK3 and MK4.
+hardsid (*) - http://hardsid.sourceforge.net/
+	Written by Jarno Paananen and Simon White. A Linux driver for the
+	Hardsidcards and the SID-Chips on Catweasel MK3 and MK4.
 
-hardsid-catweasel (*) - http://www.bel.fi/~alankila/blog/2005/12/30/HardSID-Catweasel%200.01.html,
-	written by Antti Lankila. This driver only contains support for
+hardsid-catweasel (*) - http://www.bel.fi/~alankila/blog/2005/12/30/HardSID-Catweasel%200.01.html
+	Written by Antti Lankila. This driver only contains support for
 	Catweasel MK4 cards and is a rework of the hardsid driver.
 
-cw2dmk - http://www.tim-mann.org/catweasel.html, written by Tim Mann.
-	A Linux driver (other platforms are also supported) for accessing the
-	floppies on a Catweasel Controller, especially TRS80 related formats
-	are supported. This package does not use a kernel driver to access
-	the Catweasel controller, but you should avoid using this program
-	when a kernel driver from another package is loaded.
+cw2dmk - http://www.tim-mann.org/catweasel.html
+	Written by Tim Mann. A Linux driver (other platforms are also
+	supported) for accessing the floppies on a Catweasel Controller,
+	especially TRS80 related formats are supported. This package does
+	not use a kernel driver to access the Catweasel controller, but you
+	should avoid using this program when a kernel driver from another
+	package is loaded.
 
 hardsec_cw - http://webpages.charter.net/thecomputercollection/hardsec_cw.tar.gz
-	adapted version of cw2dmk by Jay Jaeger especially for hard
-	sectored disks
+	Adapted version of cw2dmk by Jay Jaeger based on some work by
+	Jim Battle, especially for hard sectored disks.
 
 (*) Currently you may load only one kernel module accessing the
     Catweasel controller at the same time.
