@@ -1,3 +1,28 @@
+cw 0.13-20090511
+	* included cwio as interface to the kernel driver for other programs
+	* included new FPGA firmware for MK4 cards
+	* support for Victor 9000 disks was added (thanks to Jonathan
+	  Gevaryahu for supplying raw images)
+	* kernel driver: raw values to be written to disk are now subtracted
+	  from 0x7f instead of 0x80
+	* changed handling of raw images. raw images created with the current
+	  version are not compatible with earlier versions of cwtool, but it
+	  is still possible to read older raw images with the current cwtool
+	* new option: -o
+	* support for textual raw images (useful in combination with -o)
+	* consolidated naming scheme for disk formats (thanks to Jonathan
+	  Gevaryahu)
+	* changed configuration for mac_dsdd_800 and mac_dsdd_800_524.
+	  these formats are now using an experimental error correction.
+	  this may reduce read errors in some situations (thanks to Yves
+	  Benabou for supplying raw images)
+	* when writing D64 images the disk id used in sector headers is now
+	  taken from the BAM of the D64 image (offsets 0x165a2 and 0x165a3
+	  in the D64 image)
+	* corrected c1541 formats for 300 rpm drives with 40 and 42 tracks
+	* drive directives in /etc/cwtoolrc and ~/.cwtoolrc are now also
+	  used with cwtool -R and cwtool -W
+
 cw 0.12.3-20080211
 	* changed configuration mac_5.25. writing such images should now be
 	  possible (thanks to Matt Carpenter for supplying raw images and
@@ -16,7 +41,7 @@ cw 0.12.2-20070324
 	  Linux 2.4
 
 cw 0.12.1-20070319
-	* slightly changed configuration mac_dd_800 and mac_dd_800_524
+	* slightly changed configuration for mac_dd_800 and mac_dd_800_524
 	* enabled post compensation in all disk configurations. this should
 	  improve readability of disks but will also slow down disk reading
 	  especially on older computers with CPUs below 1 GHz
@@ -67,9 +92,9 @@ cw 0.11-20060806
 	  added
 	* added configuration c1541_d64, c1541_40_d64 and c1541_42_d64 for
 	  D64 disk images with 35, 40 and 42 tracks
-	* support for 360K drives was added (thanks to Jarkko Lethi for
-	  supplying such a drive). those drives typically operate with 300
-	  rpm instead of 360 rpm like the 1.2M drives do
+	* support for 5.25" 360K drives was added (thanks to Jarkko Lethi
+	  for supplying such a drive). those drives typically operate with
+	  300 rpm instead of 360 rpm like the 1.2M drives do
 	* added configuration c1541_300, c1541_40_300, c1541_42_300,
 	  c1541_d64_300, c1541_40_d64_300, c1541_42_d64_300, c1541_g64_300,
 	  c1541_40_g64_300 and c1541_42_g64_300. these formats are an
@@ -109,7 +134,7 @@ cw 0.09-20060110
 	  writing such disks the tracks inbetween are now cleared,
 	  furthermore other timings are used
 	* corrected track numbering for c1571, but i do not own a C1571 so
-	  i could not test if it works now correctly
+	  i could not test if it is now working correctly
 
 cw 0.08-20051202
 	* first official release

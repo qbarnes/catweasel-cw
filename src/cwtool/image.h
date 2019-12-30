@@ -13,11 +13,13 @@
 #ifndef CWTOOL_IMAGE_H
 #define CWTOOL_IMAGE_H
 
-#include "cwtool.h"
+#include "types.h"
+#include "global.h"
 #include "image/raw.h"
 #include "image/g64.h"
 #include "image/d64.h"
 #include "image/plain.h"
+#include "image/desc.h"
 
 union image
 	{
@@ -27,9 +29,14 @@ union image
 	struct image_plain		pln;
 	};
 
+#define IMAGE_FLAG_NONE			0
+#define IMAGE_FLAG_SAME_TRACK		(1 << 0)
+#define IMAGE_FLAG_CONTINUOUS_TRACK	(1 << 1)
+#define IMAGE_FLAG_84_TRACKS		(1 << 2)
+
 /*
  * although every image gets struct image_track, this struct is currently
- * only relevant for image "raw", all the other image formates don't access
+ * only relevant for image "raw", all the other image formats don't access
  * it
  */
 
@@ -55,21 +62,7 @@ struct image_track
 #define IMAGE_FLAG_NONE			0
 #define IMAGE_FLAG_IGNORE_SIZE		(1 << 0)
 
-struct fifo;
-struct disk_sector;
 struct file;
-
-struct image_desc
-	{
-	char				name[CWTOOL_MAX_NAME_LEN];
-	int				level;
-	int				(*open)(union image *, char *, int, int);
-	int				(*close)(union image *);
-	int				(*offset)(union image *);
-	int				(*track_read)(union image *, struct image_track *, struct fifo *, struct disk_sector *, int, int);
-	int				(*track_write)(union image *, struct image_track *, struct fifo *, struct disk_sector *, int, int);
-	int				(*track_done)(union image *, struct image_track *, int);
-	};
 
 extern struct image_desc		*image_search_desc(const char *);
 extern int				image_open(union image *, struct file *, char *, int);

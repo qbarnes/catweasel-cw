@@ -8,15 +8,15 @@ eMail:    cw@unusedino.de
   =======================
 
 
-cw is (yet another) package for the Catweasel controller, look under [6] for
+cw is (yet another) package for the Catweasel controller, look under [5] for
 other existing packages. This package is especially for accessing the floppy
-drives connected to Catweasel. Currently the MK3 and MK4 controller cards
-are supported. cw consists of a kernel driver and a companion user space
-program (cwtool). The kernel driver should work with Linux 2.4 and 2.6. Look
-at the homepage of the manufacturer http://www.jschoenfeld.com/ for more
-details about the controller features. Please see also [4] for some hardware
-oddities you should know about, before complaining that something does not
-work as expected.
+drives connected to Catweasel. Currently the MK3, MK4 and MK4+ controller
+cards are supported. cw consists of a kernel driver and a companion user
+space program (cwtool). The kernel driver should work with Linux 2.4 and 2.6.
+Look at the homepage of the manufacturer http://www.jschoenfeld.com/ for more
+details about the controller features. Please read also the man page for
+some hardware oddities you should know about, before complaining that
+something does not work as expected.
 
 
   ============================
@@ -29,8 +29,8 @@ source of your running kernel in order to compile the driver module. cw was
 tested on x86 under different distributions with different Linux kernel
 versions (to name a few: 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 all directly
 taken from http://www.kernel.org/), it also succesfully compiled on
-Knoppix 4.0.2, SuSE 10.0, 10.1, 10.2 and 10.3. There were also reports,
-that cw runs on PowerPC platforms under Linux without problems.
+Knoppix 4.0.2, SuSE 10.0, 10.1, 10.2, 10.3 and 11.1. There were also
+reports, that cw runs on PowerPC platforms under Linux without problems.
 
 You may build cwtool with dietlibc, just set and export the environment
 variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
@@ -45,22 +45,22 @@ http://www.fefe.de/dietlibc/ for more.
 
 NOTE: The file conf/cwtoolrc.default contains the configuration for all
       currently supported disk formats. This file is also compiled into
-      cwtool (you may see the contents with 'cwtool -D'). You may also place
-      a customized version of this file to /etc/cwtoolrc or $HOME/.cwtoolrc,
-      so cwtool will load it on every start up. But currently there is no
-      description how such a file has to look like, because the syntax may
-      change in future versions. For easy changes such as a different number
-      of sectors per track you should use conf/cwtoolrc.default as a
-      template. But be prepared that you may have to do your changes again
-      with new versions of cwtool.
+      cwtool (comments are stripped away, you may see the contents with
+      'cwtool -D'). You may also place a customized version of this file
+      to /etc/cwtoolrc or $HOME/.cwtoolrc, so cwtool will load it on every
+      start up. But currently there is no description how such a file has
+      to look like, because the syntax may change in future versions. For
+      easy changes such as a different number of sectors per track you
+      should use conf/cwtoolrc.default as a template. But be prepared that
+      you may have to do your changes again with new versions of cwtool.
 
 NOTE: If you use devfs you have to determine yourself how to add the device
-      nodes permanently, because devfs will be removed in future versions of
-      the kernel i do not plan to add support for it. Starting with cw-0.11
-      basic support for udev was introduced, so a 'make install' should add
-      the needed things. But as every distribution handles udev a little
-      bit different it may not work on your installation (see also point 2b
-      below)
+      nodes permanently. I do not plan to add support for it, because
+      devfs is now obsolete and will be removed in future versions of the
+      kernel. Starting with cw-0.11 basic support for udev was introduced,
+      so a 'make install' should add the needed things. But as every
+      distribution handles udev a little bit different it may not work on
+      your installation (see also step 2b below)
 
 NOTE: You need to be root to do the things described below.
 
@@ -143,120 +143,8 @@ NOTE: You may use 'make uninstall' to uninstall cw, the parameters of
       but after a 'make clean' these saved parameters will be lost.
 
 
-  =====================
-  [4] HARDWARE ODDITIES
-  =====================
-
-
-Cabling
--------
-Do not use long floppy cables. They worsen signal quality and may produce
-errors you won't get with shorter cables.
-
-5.25" drives and C1541
-----------------------
-If you want to read both sides of a C1541 disk you need to modify your 5.25"
-floppy drive, because of the missing index hole on the flip side, look at
-http://home.t-online.de/home/indcomp/flipside.html for more details.
-
-NOTE: older 360K drives seem to read data independently of the index pulse
-      being present or not. So you may use such drives without modifications,
-      but you have to instruct the driver to not rely on the
-      diskchange-signal, see below.
-
-5.25" 360K drives
------------------
-Assume your 360K drive is on /dev/cw0raw0, then try the following (yes the
-line break is ok, but you may also write it in one line):
-
-# cwtool -I -e 'drive "/dev/cw0raw0" { inverted_diskchange yes
-      double_step yes }'
-
-Those drives seem to give an inverted diskchange-signal and work with 300
-rpm instead of 360 rpm like the 1.2M ones. My 360K drive also reads data if
-no index pulse is present, so you do not need to modify such drives, just
-use the following command to configure the driver accordingly (yes the line
-break is ok, but you may also write it in one line):
-
-# cwtool -I -e 'drive "/dev/cw0raw0" { ignore_diskchange yes
-      double_step yes }'
-
-This instructs the driver to not check if an index pulse is present or not.
-But this also means that the driver will not return an error if no disk is in
-the drive. You should now be able to read a C1541 disk or a Apple IIe disk:
-
-# cwtool -R -v c1541_300 /dev/cw0raw0 image.d64
-
-# cwtool -R -v mac_5.25_300 /dev/cw0raw0 image.bin
-
-As mentioned above 360K drives operate with 300 rpm instead of 360 rpm like
-the 1.2M ones, so you need to use different disk configurations.
-
-3.5" DD and HD disks
---------------------
-There is a difference between 3.5" HD and DD disks, especially when HD disks
-are written in a DD drive, below is an explanation shamelessly stolen from
-Michael Krause's cwfloppy README:
-
-"... The small hole in the upper left corner DOES make a difference.
-     Back when you've been buying lots of disks, it was NOT just some trick
-     of the floppy disk industry to make you buy expensive HD disks when
-     you thought you could get away with cheap DD disks :-)
-      
-     When you insert an HD disk into an HD floppy drive, the floppy drive
-     actually changes physical parameters, for example magnetization
-     thresholds and writing current strength. A floppy drive does not and
-     can not write an HD disk in HD format with the same physical
-     parameters as a DD disk in DD format!
-      
-     If you use HD disks with HD format and DD disks with DD format,
-     everything's fine. However, at some time in the nineties, the floppy
-     disk industry stopped selling DD disks. Because many Amiga users still
-     relied on the DD format (only the Amiga 4000 has an HD drive), they
-     simply took HD disks and used them in their DD drives.  Some users
-     covered the HD indicator hole with a piece of tape, some didn't.
-     Because their drives were only DD drives, the drive didn't care -- so
-     it really didn't make a difference either! Most HD disks seem to work
-     fine this way, even though they have been constructed for HD
-     formatting. In fact, I've never come across an HD disk that could NOT
-     be used in an Amiga DD drive. There have been people claiming
-     otherwise, though.
-      
-     However, if you insert an HD disk formatted in DD format into an HD
-     drive, you HAVE to take care to cover the HD indicator hole! If you do
-     not do this, the drive will think it is an HD formatted disk and
-     adjust its physical parameters accordingly, leading to READ and/or
-     WRITE ERRORS on a basically fine disk! Unfortunately, this can not be
-     worked around in software.
-      
-     So, if somebody gives you a disk with an HD hole and you can not mount
-     it as either Amiga HD or MS-DOS HD, it could be a perfectly fine DD
-     formatted disk -- only your drive is in the wrong mode to read it
-     without errors, because it detects the uncovered HD hole and thinks it
-     is in HD format. Cover the hole with some piece of tape, and
-     everything will be fine.
-      
-     If you don't believe me, try this:
-      
-     - Get an HD disk with open hole and try formatting it in, say, Amiga DD
-       mode using your Catweasel with a standard contemporary HD floppy drive.
-       It doesn't work.. the validation gives lots of errors.
-      
-     - Try the same with the HD hole covered. It should work, provided the
-       disk is not damaged and it is not one of the few HD disks that
-       really don't work in DD mode.
-      
-     - Now that the disk has been formatted correctly in DD mode, look
-       at the histogram, you can clearly distinguish the three different
-       MFM magnetization pulse time intervals.
-      
-     - Now remove the tape from the HD hole and look at the histogram
-       again. How can anybody expect to recover any data from this disk
-       now? :-) ..."
-
-
   =================
-  [5] CONTRIBUTIONS
+  [4] CONTRIBUTIONS
   =================
 
 
@@ -266,13 +154,16 @@ README in contrib/cwtoolgui. If you have enhancements for this GUI or other
 useful additions, please contact me under the mail address listed at the
 start of this README.
 
+If you want to use the kernel driver of cw for your own programs please have
+a look at the src/cwio directory.
+
 
   ====================
-  [6] RELATED PROJECTS
+  [5] RELATED PROJECTS
   ====================
 
 
-There are at least 5 other Linux drivers for the Catweasel controller:
+There are at least 6 other Linux drivers for the Catweasel controller:
 
 catweasel (*) - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
 	Linux driver for SID, Joysticks and Amiga keyboard. If you also want
@@ -305,6 +196,10 @@ cw2dmk - http://www.tim-mann.org/catweasel.html, written by Tim Mann.
 	are supported. This package does not use a kernel driver to access
 	the Catweasel controller, but you should avoid using this program
 	when a kernel driver from another package is loaded.
+
+hardsec_cw - http://webpages.charter.net/thecomputercollection/hardsec_cw.tar.gz
+	adapted version of cw2dmk by Jay Jaeger especially for hard
+	sectored disks
 
 (*) Currently you may load only one kernel module accessing the
     Catweasel controller at the same time.

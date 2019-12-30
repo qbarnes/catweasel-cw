@@ -16,12 +16,18 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
-#include "../cwtool.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../format.h"
 #include "mfm.h"
-#include "raw.h"
+#include "range.h"
+#include "bitstream.h"
+#include "container.h"
+#include "match_simple.h"
+#include "postcomp_simple.h"
+#include "histogram.h"
 #include "setvalue.h"
 
 
@@ -42,22 +48,43 @@
 #define FLAG_RD_IGNORE_CHECKSUMS	(1 << 1)
 #define FLAG_RD_IGNORE_TRACK_MISMATCH	(1 << 2)
 #define FLAG_RD_IGNORE_FORMAT_BYTE	(1 << 3)
-#define FLAG_RD_POSTCOMP		(1 << 4)
-#define FLAG_RW_CRC16_INIT_VALUE_SET	(1 << 5)
+#define FLAG_RD_MATCH_SIMPLE		(1 << 4)
+#define FLAG_RD_MATCH_SIMPLE_FIXUP	(1 << 5)
+#define FLAG_RD_POSTCOMP_SIMPLE		(1 << 6)
+#define FLAG_RW_CRC16_INIT_VALUE_SET	(1 << 0)
 
 
 
 /****************************************************************************
  * mfm_nec765_track_number
  ****************************************************************************/
-static int
+static cw_count_t
 mfm_nec765_track_number(
 	struct mfm_nec765		*mfm_nec,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	if (mfm_nec->rw.track_step == 1) return (track);
-	return ((track / mfm_nec->rw.track_step) + (track % 2));
+	if ((format_track == -1) && (format_side == -1)) return (cwtool_track / (2 * mfm_nec->rw.track_step));
+	return (format_track);
+	}
+
+
+
+/****************************************************************************
+ * mfm_nec765_side_number
+ ****************************************************************************/
+static cw_count_t
+mfm_nec765_side_number(
+	struct mfm_nec765		*mfm_nec,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
+
+	{
+	if ((format_track == -1) && (format_side == -1)) return (cwtool_track % 2);
+	return (format_side);
 	}
 
 
@@ -71,7 +98,7 @@ mfm_nec765_sector_shift(
 	int				sector)
 
 	{
-	return (mfm_get_sector_shift(mfm_nec->rw.pshift, sector, CWTOOL_MAX_SECTOR));
+	return (mfm_get_sector_shift(mfm_nec->rw.pshift, sector, GLOBAL_NR_SECTORS));
 	}
 
 
@@ -101,6 +128,7 @@ mfm_nec765_read_sector2(
 	struct fifo			*ffo_l1,
 	struct mfm_nec765		*mfm_nec,
 	struct disk_error		*dsk_err,
+	struct range_sector		*rng_sec,
 	unsigned char			*header,
 	unsigned char			*data)
 
@@ -110,16 +138,18 @@ mfm_nec765_read_sector2(
 	while (1)
 		{
 		*dsk_err = (struct disk_error) { };
-		if (mfm_read_sync(ffo_l1, mfm_nec->rw.sync_value, mfm_nec->rw.sync_length) == -1) return (-1);
+		if (mfm_read_sync(ffo_l1, range_sector_header(rng_sec), mfm_nec->rw.sync_value, mfm_nec->rw.sync_length) == -1) return (-1);
 		bitofs = fifo_get_rd_bitofs(ffo_l1);
 		if (mfm_read_bytes(ffo_l1, dsk_err, header, HEADER_SIZE) == -1) return (-1);
+		range_set_end(range_sector_header(rng_sec), fifo_get_rd_bitofs(ffo_l1));
 		fifo_set_rd_bitofs(ffo_l1, bitofs);
 		if (format_compare2("id_address_mark: got 0x%02x, expected 0x%02x", header[0], mfm_nec->rw.id_address_mark) == 0) break;
 		}
 	data_size = mfm_nec765_sector_size(mfm_nec, header[3] - 1);
-	if (mfm_read_sync(ffo_l1, mfm_nec->rw.sync_value, mfm_nec->rw.sync_length) == -1) return (-1);
+	if (mfm_read_sync(ffo_l1, range_sector_data(rng_sec), mfm_nec->rw.sync_value, mfm_nec->rw.sync_length) == -1) return (-1);
 	if (mfm_read_bytes(ffo_l1, dsk_err, data, data_size + 3) == -1) return (-1);
-	verbose(2, "rewinding to bit offset %d", bitofs);
+	range_set_end(range_sector_data(rng_sec), fifo_get_rd_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "rewinding to bit offset %d", bitofs);
 	fifo_set_rd_bitofs(ffo_l1, bitofs);
 	return (1);
 	}
@@ -158,50 +188,55 @@ static int
 mfm_nec765_read_sector(
 	struct fifo			*ffo_l1,
 	struct mfm_nec765		*mfm_nec,
+	struct container		*con,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	struct disk_error		dsk_err;
+	struct range_sector		rng_sec = RANGE_SECTOR_INIT;
 	unsigned char			header[HEADER_SIZE];
 	unsigned char			data[DATA_SIZE];
-	int				result, sector, data_size;
+	int				result, track, side, sector, data_size;
 
-	if (mfm_nec765_read_sector2(ffo_l1, mfm_nec, &dsk_err, header, data) == -1) return (-1);
+	if (mfm_nec765_read_sector2(ffo_l1, mfm_nec, &dsk_err, &rng_sec, header, data) == -1) return (-1);
 
 	/* accept only valid sector numbers */
 
+	track  = mfm_nec765_track_number(mfm_nec, cwtool_track, format_track, format_side);
+	side   = mfm_nec765_side_number(mfm_nec, cwtool_track, format_track, format_side);
 	sector = header[3] - 1;
-	track  = mfm_nec765_track_number(mfm_nec, track);
 	if ((sector < 0) || (sector >= mfm_nec->rw.sectors))
 		{
-		verbose(1, "sector %d out of range", sector);
+		verbose_message(GENERIC, 1, "sector %d out of range", sector);
 		return (0);
 		}
-	verbose(1, "got sector %d", sector);
+	verbose_message(GENERIC, 1, "got sector %d", sector);
 
 	/* check sector quality */
 
 	data_size = mfm_nec765_sector_size(mfm_nec, sector);
 	result = format_compare2("sector size: got %d, expected %d", 1 << (header[4] + 7), data_size);
-	if (result > 0) verbose(2, "wrong sector size on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "wrong sector size on sector %d", sector);
 	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_SECTOR_SIZE) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_SIZE, result);
 
-	result = format_compare2("header crc16 checksum: got 0x%04x, expected 0x%04x", mfm_read_ushort_be(&header[5]), mfm_crc16(mfm_nec->rw.crc16_init_value, header, 5));
-	result += format_compare2("data crc16 checksum: got 0x%04x, expected 0x%04x", mfm_read_ushort_be(&data[data_size + 1]), mfm_crc16(mfm_nec->rw.crc16_init_value, data, data_size + 1));
-	if (result > 0) verbose(2, "checksum error on sector %d", sector);
+	result = format_compare2("header crc16 checksum: got 0x%04x, expected 0x%04x", mfm_read_u16_be(&header[5]), mfm_crc16(mfm_nec->rw.crc16_init_value, header, 5));
+	result += format_compare2("data crc16 checksum: got 0x%04x, expected 0x%04x", mfm_read_u16_be(&data[data_size + 1]), mfm_crc16(mfm_nec->rw.crc16_init_value, data, data_size + 1));
+	if (result > 0) verbose_message(GENERIC, 2, "checksum error on sector %d", sector);
 	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
-	result = format_compare2("track: got %d, expected %d", header[1], track / 2);
-	result += format_compare2("side: got %d, expected %d", header[2], track % 2);
-	if (result > 0) verbose(2, "track or side mismatch on sector %d", sector);
+	result = format_compare2("track: got %d, expected %d", header[1], track);
+	result += format_compare2("side: got %d, expected %d", header[2], side);
+	if (result > 0) verbose_message(GENERIC, 2, "track or side mismatch on sector %d", sector);
 	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare3("data_address_mark: got 0x%02x, expected 0x%02x or 0x%02x", data[0], mfm_nec->rw.data_address_mark1, mfm_nec->rw.data_address_mark2);
-	if (result > 0) verbose(2, "wrong data_address_mark on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "wrong data_address_mark on sector %d", sector);
 	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_FORMAT_BYTE) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
@@ -210,6 +245,8 @@ mfm_nec765_read_sector(
 	 * current one
 	 */
 
+	range_sector_set_number(&rng_sec, sector);
+	if (con != NULL) container_append_range_sector(con, &rng_sec);
 	disk_set_sector_number(&dsk_sct[sector], sector);
 	disk_sector_read(&dsk_sct[sector], &dsk_err, &data[1]);
 	return (1);
@@ -225,7 +262,9 @@ mfm_nec765_write_sector(
 	struct fifo			*ffo_l1,
 	struct mfm_nec765		*mfm_nec,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	unsigned char			header[HEADER_SIZE];
@@ -233,17 +272,17 @@ mfm_nec765_write_sector(
 	int				sector = disk_get_sector_number(dsk_sct);
 	int				data_size;
 
-	verbose(1, "writing sector %d", sector);
+	verbose_message(GENERIC, 1, "writing sector %d", sector);
 	header[0] = mfm_nec->rw.id_address_mark;
-	header[1] = mfm_nec765_track_number(mfm_nec, track) / 2;
-	header[2] = mfm_nec765_track_number(mfm_nec, track) % 2;
+	header[1] = mfm_nec765_track_number(mfm_nec, cwtool_track, format_track, format_side);
+	header[2] = mfm_nec765_side_number(mfm_nec, cwtool_track, format_track, format_side);
 	header[3] = sector + 1;
 	header[4] = mfm_nec765_sector_shift(mfm_nec, sector);
 	data[0]   = mfm_nec->rw.data_address_mark1;
 	data_size = mfm_nec765_sector_size(mfm_nec, sector);
-	mfm_write_ushort_be(&header[5], mfm_crc16(mfm_nec->rw.crc16_init_value, header, 5));
+	mfm_write_u16_be(&header[5], mfm_crc16(mfm_nec->rw.crc16_init_value, header, 5));
 	disk_sector_write(&data[1], dsk_sct);
-	mfm_write_ushort_be(&data[data_size + 1], mfm_crc16(mfm_nec->rw.crc16_init_value, data, data_size + 1));
+	mfm_write_u16_be(&data[data_size + 1], mfm_crc16(mfm_nec->rw.crc16_init_value, data, data_size + 1));
 	return (mfm_nec765_write_sector2(ffo_l1, mfm_nec, header, data, data_size + 3));
 	}
 
@@ -256,13 +295,49 @@ static int
 mfm_nec765_statistics(
 	union format			*fmt,
 	struct fifo			*ffo_l0,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	raw_histogram(ffo_l0, track, mfm_nec765_track_number(&fmt->mfm_nec, track));
-	raw_precomp_statistics(ffo_l0, fmt->mfm_nec.rw.bnd, 3);
-	if (fmt->mfm_nec.rd.flags & FLAG_RD_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->mfm_nec.rw.bnd, 3, track, mfm_nec765_track_number(&fmt->mfm_nec, track));
+	histogram_normal(
+		ffo_l0,
+		cwtool_track,
+		mfm_nec765_track_number(&fmt->mfm_nec, cwtool_track, format_track, format_side),
+		mfm_nec765_side_number(&fmt->mfm_nec, cwtool_track, format_track, format_side));
+	if (fmt->mfm_nec.rd.flags & FLAG_RD_POSTCOMP_SIMPLE) histogram_postcomp_simple(
+		ffo_l0,
+		fmt->mfm_nec.rw.bnd,
+		3,
+		cwtool_track,
+		mfm_nec765_track_number(&fmt->mfm_nec, cwtool_track, format_track, format_side),
+		mfm_nec765_side_number(&fmt->mfm_nec, cwtool_track, format_track, format_side));
 	return (1);
+	}
+
+
+
+/****************************************************************************
+ * mfm_nec765_read_track2
+ ****************************************************************************/
+static void
+mfm_nec765_read_track2(
+	union format			*fmt,
+	struct container		*con,
+	struct fifo			*ffo_l0,
+	struct fifo			*ffo_l3,
+	struct disk_sector		*dsk_sct,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
+
+	{
+	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+
+	if (fmt->mfm_nec.rd.flags & FLAG_RD_POSTCOMP_SIMPLE) postcomp_simple(ffo_l0, fmt->mfm_nec.rw.bnd, 3);
+	bitstream_read(ffo_l0, &ffo_l1, fmt->mfm_nec.rw.bnd, 3);
+	while (mfm_nec765_read_sector(&ffo_l1, &fmt->mfm_nec, con, dsk_sct, cwtool_track, format_track, format_side) != -1) ;
 	}
 
 
@@ -273,18 +348,35 @@ mfm_nec765_statistics(
 static int
 mfm_nec765_read_track(
 	union format			*fmt,
+	struct container		*con,
 	struct fifo			*ffo_l0,
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+	struct match_simple_info	mat_sim_nfo =
+		{
+		.con          = con,
+		.fmt          = fmt,
+		.ffo_l0       = ffo_l0,
+		.ffo_l3       = ffo_l3,
+		.dsk_sct      = dsk_sct,
+		.cwtool_track = cwtool_track,
+		.format_track = format_track,
+		.format_side  = format_side,
+		.bnd          = fmt->mfm_nec.rw.bnd,
+		.bnd_size     = 3,
+		.callback     = mfm_nec765_read_track2,
+		.merge_two    = fmt->mfm_nec.rd.flags & FLAG_RD_MATCH_SIMPLE,
+		.merge_all    = fmt->mfm_nec.rd.flags & FLAG_RD_MATCH_SIMPLE,
+		.fixup        = fmt->mfm_nec.rd.flags & FLAG_RD_MATCH_SIMPLE_FIXUP
+		};
 
-	if (fmt->mfm_nec.rd.flags & FLAG_RD_POSTCOMP) raw_postcomp(ffo_l0, fmt->mfm_nec.rw.bnd, 3);
-	raw_read(ffo_l0, &ffo_l1, fmt->mfm_nec.rw.bnd, 3);
-	while (mfm_nec765_read_sector(&ffo_l1, &fmt->mfm_nec, dsk_sct, track) != -1) ;
+	if ((fmt->mfm_nec.rd.flags & FLAG_RD_MATCH_SIMPLE) || (options_get_output())) match_simple(&mat_sim_nfo);
+	else mfm_nec765_read_track2(fmt, NULL, ffo_l0, ffo_l3, dsk_sct, cwtool_track, format_track, format_side);
 	return (1);
 	}
 
@@ -299,25 +391,28 @@ mfm_nec765_write_track(
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
 	struct fifo			*ffo_l0,
-	int				track)
+	unsigned char			*data,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+	unsigned char			data_l1[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1 = FIFO_INIT(data_l1, sizeof (data_l1));
 	int				i;
 
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.prolog_value, fmt->mfm_nec.wr.prolog_length) == -1) return (0);
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.fill_value1, fmt->mfm_nec.wr.fill_length1)   == -1) return (0);
 	if (mfm_write_sync(&ffo_l1, 0x5224, 3) == -1) return (0);
 	if (mfm_write_fill(&ffo_l1, 0xfc, 1)   == -1) return (0);
-	for (i = 0; i < fmt->mfm_nec.rw.sectors; i++) if (mfm_nec765_write_sector(&ffo_l1, &fmt->mfm_nec, &dsk_sct[i], track) == -1) return (0);
+	for (i = 0; i < fmt->mfm_nec.rw.sectors; i++) if (mfm_nec765_write_sector(&ffo_l1, &fmt->mfm_nec, &dsk_sct[i], cwtool_track, format_track, format_side) == -1) return (0);
 	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.fill_value6, fmt->mfm_nec.wr.fill_length6)   == -1) return (0);
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.fill_value7, fmt->mfm_nec.wr.fill_length7)   == -1) return (0);
 	if (mfm_write_sync(&ffo_l1, 0x4489, 3) == -1) return (0);
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.epilog_value, fmt->mfm_nec.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1);
-	if (raw_write(&ffo_l1, ffo_l0, fmt->mfm_nec.rw.bnd, fmt->mfm_nec.wr.precomp, 3) == -1) return (0);
+	if (bitstream_write(&ffo_l1, ffo_l0, fmt->mfm_nec.rw.bnd, fmt->mfm_nec.wr.precomp, 3) == -1) return (0);
 	return (1);
 	}
 
@@ -337,36 +432,39 @@ mfm_nec765_write_track(
 #define MAGIC_IGNORE_CHECKSUMS		2
 #define MAGIC_IGNORE_TRACK_MISMATCH	3
 #define MAGIC_IGNORE_FORMAT_BYTE	4
-#define MAGIC_POSTCOMP			5
-#define MAGIC_PROLOG_LENGTH		6
-#define MAGIC_PROLOG_VALUE		7
-#define MAGIC_EPILOG_LENGTH		8
-#define MAGIC_EPILOG_VALUE		9
-#define MAGIC_FILL_LENGTH1		10
-#define MAGIC_FILL_VALUE1		11
-#define MAGIC_FILL_LENGTH2		12
-#define MAGIC_FILL_VALUE2		13
-#define MAGIC_FILL_LENGTH3		14
-#define MAGIC_FILL_VALUE3		15
-#define MAGIC_FILL_LENGTH4		16
-#define MAGIC_FILL_VALUE4		17
-#define MAGIC_FILL_LENGTH5		18
-#define MAGIC_FILL_VALUE5		19
-#define MAGIC_FILL_LENGTH6		20
-#define MAGIC_FILL_VALUE6		21
-#define MAGIC_FILL_LENGTH7		22
-#define MAGIC_FILL_VALUE7		23
-#define MAGIC_PRECOMP			24
-#define MAGIC_SECTORS			25
-#define MAGIC_SYNC_LENGTH		26
-#define MAGIC_SYNC_VALUE		27
-#define MAGIC_CRC16_INIT_VALUE		28
-#define MAGIC_ID_ADDRESS_MARK		29
-#define MAGIC_DATA_ADDRESS_MARK1	30
-#define MAGIC_DATA_ADDRESS_MARK2	31
-#define MAGIC_TRACK_STEP		32
-#define MAGIC_SECTOR_SIZES		33
-#define MAGIC_BOUNDS			34
+#define MAGIC_MATCH_SIMPLE		5
+#define MAGIC_MATCH_SIMPLE_FIXUP	6
+#define MAGIC_POSTCOMP_SIMPLE		7
+#define MAGIC_PROLOG_LENGTH		8
+#define MAGIC_PROLOG_VALUE		9
+#define MAGIC_EPILOG_LENGTH		10
+#define MAGIC_EPILOG_VALUE		11
+#define MAGIC_FILL_LENGTH1		12
+#define MAGIC_FILL_VALUE1		13
+#define MAGIC_FILL_LENGTH2		14
+#define MAGIC_FILL_VALUE2		15
+#define MAGIC_FILL_LENGTH3		16
+#define MAGIC_FILL_VALUE3		17
+#define MAGIC_FILL_LENGTH4		18
+#define MAGIC_FILL_VALUE4		19
+#define MAGIC_FILL_LENGTH5		20
+#define MAGIC_FILL_VALUE5		21
+#define MAGIC_FILL_LENGTH6		22
+#define MAGIC_FILL_VALUE6		23
+#define MAGIC_FILL_LENGTH7		24
+#define MAGIC_FILL_VALUE7		25
+#define MAGIC_PRECOMP			26
+#define MAGIC_SECTORS			27
+#define MAGIC_SYNC_LENGTH		28
+#define MAGIC_SYNC_VALUE		29
+#define MAGIC_CRC16_INIT_VALUE		30
+#define MAGIC_ID_ADDRESS_MARK		31
+#define MAGIC_DATA_ADDRESS_MARK1	32
+#define MAGIC_DATA_ADDRESS_MARK2	33
+#define MAGIC_TRACK_STEP		34
+#define MAGIC_SECTOR_SIZES		35
+#define MAGIC_BOUNDS_OLD		36
+#define MAGIC_BOUNDS_NEW		37
 
 
 
@@ -385,7 +483,7 @@ mfm_nec765_set_crc16_init_value(
 	for (d = 0, i = 0x4000; i > 0; i >>= 2) d = (d << 1) | ((mfm_nec->rw.sync_value & i) ? 1 : 0);
 	for (i = 0; i < mfm_nec->rw.sync_length; i++) data[i] = d;
 	mfm_nec->rw.crc16_init_value = mfm_crc16(0xffff, data, i);
-	debug(2, "calculated crc16_init_value = 0x%04x", mfm_nec->rw.crc16_init_value);
+	debug_message(GENERIC, 2, "calculated crc16_init_value = 0x%04x", mfm_nec->rw.crc16_init_value);
 	return (1);
 	}
 
@@ -440,17 +538,17 @@ mfm_nec765_set_defaults(
 			.track_step         = 1,
 			.bnd                =
 				{
-				BOUNDS(0x0800, 0x1b52, 0x2300, 1),
-				BOUNDS(0x2400, 0x297c, 0x3000, 2),
-				BOUNDS(0x3100, 0x37a5, 0x4000, 3)
+				BOUNDS_NEW(0x1600, 0x1a52, 0x2300, 1),
+				BOUNDS_NEW(0x2400, 0x287c, 0x3000, 2),
+				BOUNDS_NEW(0x3100, 0x36a5, 0x4000, 3)
 				}
 			}
 		};
 
-	debug(2, "setting defaults");
+	debug_message(GENERIC, 2, "setting defaults");
 	fmt->mfm_nec = mfm_nec;
 	mfm_nec765_set_crc16_init_value(&fmt->mfm_nec);
-	mfm_fill_sector_shift(fmt->mfm_nec.rw.pshift, 0, CWTOOL_MAX_SECTOR, 2);
+	mfm_fill_sector_shift(fmt->mfm_nec.rw.pshift, 0, GLOBAL_NR_SECTORS, 2);
 	}
 
 
@@ -466,13 +564,15 @@ mfm_nec765_set_read_option(
 	int				ofs)
 
 	{
-	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_IGNORE_SECTOR_SIZE)    return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_SECTOR_SIZE));
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_CHECKSUMS));
 	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_TRACK_MISMATCH));
 	if (magic == MAGIC_IGNORE_FORMAT_BYTE)    return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_FORMAT_BYTE));
-	debug_error_condition(magic != MAGIC_POSTCOMP);
-	return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_POSTCOMP));
+	if (magic == MAGIC_MATCH_SIMPLE)          return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_MATCH_SIMPLE));
+	if (magic == MAGIC_MATCH_SIMPLE_FIXUP)    return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_MATCH_SIMPLE_FIXUP));
+	debug_error_condition(magic != MAGIC_POSTCOMP_SIMPLE);
+	return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_POSTCOMP_SIMPLE));
 	}
 
 
@@ -488,7 +588,7 @@ mfm_nec765_set_write_option(
 	int				ofs)
 
 	{
-	debug(2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_PROLOG_LENGTH) return (setvalue_ushort(&fmt->mfm_nec.wr.prolog_length, val, 1, 0xffff));
 	if (magic == MAGIC_PROLOG_VALUE)  return (setvalue_uchar(&fmt->mfm_nec.wr.prolog_value, val, 0, 0xff));
 	if (magic == MAGIC_EPILOG_LENGTH) return (setvalue_ushort(&fmt->mfm_nec.wr.epilog_length, val, 1, 0xffff));
@@ -524,11 +624,11 @@ mfm_nec765_set_rw_option(
 	int				ofs)
 
 	{
-	debug(2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_SECTORS)
 		{
-		mfm_fill_sector_shift(fmt->mfm_nec.rw.pshift, fmt->mfm_nec.rw.sectors, CWTOOL_MAX_SECTOR, 2);
-		return (setvalue_uchar(&fmt->mfm_nec.rw.sectors, val, 1, CWTOOL_MAX_SECTOR));
+		mfm_fill_sector_shift(fmt->mfm_nec.rw.pshift, fmt->mfm_nec.rw.sectors, GLOBAL_NR_SECTORS, 2);
+		return (setvalue_uchar(&fmt->mfm_nec.rw.sectors, val, 1, GLOBAL_NR_SECTORS));
 		}
 	if (magic == MAGIC_SYNC_LENGTH)
 		{
@@ -550,9 +650,10 @@ mfm_nec765_set_rw_option(
 	if (magic == MAGIC_DATA_ADDRESS_MARK1) return (setvalue_uchar(&fmt->mfm_nec.rw.data_address_mark1, val, 0, 0xff));
 	if (magic == MAGIC_DATA_ADDRESS_MARK2) return (setvalue_uchar(&fmt->mfm_nec.rw.data_address_mark2, val, 0, 0xff));
 	if (magic == MAGIC_TRACK_STEP)         return (setvalue_uchar(&fmt->mfm_nec.rw.track_step, val, 1, 2));
-	if (magic == MAGIC_SECTOR_SIZES)       return (mfm_set_sector_size(fmt->mfm_nec.rw.pshift, ofs, CWTOOL_MAX_SECTOR, val));
-	debug_error_condition(magic != MAGIC_BOUNDS);
-	return (setvalue_bounds(fmt->mfm_nec.rw.bnd, val, ofs));
+	if (magic == MAGIC_SECTOR_SIZES)       return (mfm_set_sector_size(fmt->mfm_nec.rw.pshift, ofs, GLOBAL_NR_SECTORS, val));
+	if (magic == MAGIC_BOUNDS_OLD)         return (setvalue_bounds_old(fmt->mfm_nec.rw.bnd, val, ofs));
+	debug_error_condition(magic != MAGIC_BOUNDS_NEW);
+	return (setvalue_bounds_new(fmt->mfm_nec.rw.bnd, val, ofs));
 	}
 
 
@@ -597,7 +698,34 @@ mfm_nec765_get_flags(
 	union format			*fmt)
 
 	{
+	if (options_get_output()) return (FORMAT_FLAG_OUTPUT);
 	return (FORMAT_FLAG_NONE);
+	}
+
+
+
+/****************************************************************************
+ * mfm_nec765_get_data_offset
+ ****************************************************************************/
+static int
+mfm_nec765_get_data_offset(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
+ * mfm_nec765_get_data_size
+ ****************************************************************************/
+static int
+mfm_nec765_get_data_size(
+	union format			*fmt)
+
+	{
+	return (-1);
 	}
 
 
@@ -611,7 +739,10 @@ static struct format_option		mfm_nec765_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("ignore_format_byte",    MAGIC_IGNORE_FORMAT_BYTE,    1),
-	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
+	FORMAT_OPTION_BOOLEAN("match_simple",          MAGIC_MATCH_SIMPLE,          1),
+	FORMAT_OPTION_BOOLEAN("match_simple_fixup",    MAGIC_MATCH_SIMPLE_FIXUP,    1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",              MAGIC_POSTCOMP_SIMPLE,       1),
+	FORMAT_OPTION_BOOLEAN("postcomp_simple",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_END
 	};
 
@@ -658,9 +789,11 @@ static struct format_option		mfm_nec765_rw_options[] =
 	FORMAT_OPTION_INTEGER("id_address_mark",    MAGIC_ID_ADDRESS_MARK,     1),
 	FORMAT_OPTION_INTEGER("data_address_mark1", MAGIC_DATA_ADDRESS_MARK1,  1),
 	FORMAT_OPTION_INTEGER("data_address_mark2", MAGIC_DATA_ADDRESS_MARK2,  1),
-	FORMAT_OPTION_INTEGER("track_step",         MAGIC_TRACK_STEP,          1),
+	FORMAT_OPTION_INTEGER_OBSOLETE("track_step",         MAGIC_TRACK_STEP,          1),
 	FORMAT_OPTION_INTEGER("sector_sizes",       MAGIC_SECTOR_SIZES,       -1),
-	FORMAT_OPTION_INTEGER("bounds",             MAGIC_BOUNDS,              9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",             MAGIC_BOUNDS_OLD,          9),
+	FORMAT_OPTION_INTEGER("bounds_old",         MAGIC_BOUNDS_OLD,          9),
+	FORMAT_OPTION_INTEGER("bounds_new",         MAGIC_BOUNDS_NEW,          9),
 	FORMAT_OPTION_END
 	};
 
@@ -669,7 +802,7 @@ static struct format_option		mfm_nec765_rw_options[] =
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -690,6 +823,8 @@ struct format_desc			mfm_nec765_format_desc =
 	.get_sectors      = mfm_nec765_get_sectors,
 	.get_sector_size  = mfm_nec765_get_sector_size,
 	.get_flags        = mfm_nec765_get_flags,
+	.get_data_offset  = mfm_nec765_get_data_offset,
+	.get_data_size    = mfm_nec765_get_data_size,
 	.track_statistics = mfm_nec765_statistics,
 	.track_read       = mfm_nec765_read_track,
 	.track_write      = mfm_nec765_write_track,

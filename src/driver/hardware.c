@@ -1,7 +1,17 @@
 /****************************************************************************
  ****************************************************************************
  *
- * cwhardware.c
+ * hardware.c
+ *
+ ****************************************************************************
+ *
+ * this is the lowest layer in the driver, here bits are finally thrown
+ * to the hardware. it provides functions for searching for catweasel
+ * controllers, but most of the time it is used to just do some actions in
+ * the registers of the catweasel controller. depending on underlying
+ * hardware different registers are used to achieve the wanted operation.
+ * timers and other higher level kernel infrastructure things should not be
+ * used here
  *
  ****************************************************************************
  ****************************************************************************/
@@ -18,8 +28,9 @@
 #include <linux/pci.h>
 #include <linux/version.h>
 
-#include "cwhardware.h"
-#include "cw.h"
+#include "hardware.h"
+#include "driver.h"
+#include "message.h"
 #include "ioctl.h"
 
 
@@ -62,16 +73,25 @@
 #define CW_MK4_BANK_COMPAT_MUX_OFF	0x41
 #define CW_MK4_BANK_COMPAT_MUX_ON	0x61
 
+struct cw_hardware_firmware
+	{
+	char				*id;
+	int				size;
+	int				offset;
+	int				crc16;
+	int				flags;
+	};
+
 
 
 /****************************************************************************
- * cwhardware_floppy_bit
+ * cw_hardware_floppy_bit
  ****************************************************************************/
-#define get_bit(bit)			cwhardware_floppy_bit(hrd, CW_BIT##bit)
+#define get_bit(bit)			cw_hardware_floppy_bit(hrd, CW_BIT##bit)
 #define get_mask(bit)			(1 << get_bit(bit))
 
 static int
-cwhardware_floppy_bit(
+cw_hardware_floppy_bit(
 	struct cw_hardware		*hrd,
 	int				bit)
 
@@ -110,12 +130,12 @@ cwhardware_floppy_bit(
 
 
 /****************************************************************************
- * cwhardware_floppy_register
+ * cw_hardware_floppy_register
  ****************************************************************************/
-#define get_reg(reg)			cwhardware_floppy_register(hrd, CW_REG_##reg)
+#define get_reg(reg)			cw_hardware_floppy_register(hrd, CW_REG_##reg)
 
 static int
-cwhardware_floppy_register(
+cw_hardware_floppy_register(
 	struct cw_hardware		*hrd,
 	int				reg)
 
@@ -148,10 +168,10 @@ cwhardware_floppy_register(
 
 #ifdef CONFIG_PCI
 /****************************************************************************
- * cwhardware_mk3_mk4_remove
+ * cw_hardware_mk3_mk4_remove
  ****************************************************************************/
 static void
-cwhardware_mk3_mk4_remove(
+cw_hardware_mk3_mk4_remove(
 	struct pci_dev			*dev,
 	char				*name)
 
@@ -159,7 +179,7 @@ cwhardware_mk3_mk4_remove(
 	struct cw_hardware		*hrd = (struct cw_hardware *) pci_get_drvdata(dev);
 
 	cw_debug(1, "[c%d] unregistering %s from 0x%04x", hrd->cnt->num, name, hrd->iobase);
-	cw_unregister_hardware(hrd);
+	cw_driver_unregister_hardware(hrd);
 	release_region(hrd->iobase, 256);
 	pci_disable_device(dev);
 	}
@@ -167,10 +187,10 @@ cwhardware_mk3_mk4_remove(
 
 
 /****************************************************************************
- * cwhardware_mk3_mk4_probe
+ * cw_hardware_mk3_mk4_probe
  ****************************************************************************/
 static int
-cwhardware_mk3_mk4_probe(
+cw_hardware_mk3_mk4_probe(
 	struct pci_dev			*dev,
 	const struct pci_device_id	*id,
 	int				model,
@@ -182,10 +202,10 @@ cwhardware_mk3_mk4_probe(
 
 	/* get next available controller struct */
 
-	hrd = cw_get_hardware(-1);
+	hrd = cw_driver_get_hardware(-1);
 	if (hrd == NULL)
 		{
-		cw_error("number of %d supported controllers exceeded", CW_MAX_CONTROLLERS);
+		cw_error("number of %d supported controllers exceeded", CW_NR_CONTROLLERS);
 		return (-ENODEV);
 		}
 
@@ -217,23 +237,23 @@ cwhardware_mk3_mk4_probe(
 
 
 /****************************************************************************
- * cwhardware_mk3_remove
+ * cw_hardware_mk3_remove
  ****************************************************************************/
 static void
-cwhardware_mk3_remove(
+cw_hardware_mk3_remove(
 	struct pci_dev			*dev)
 
 	{
-	cwhardware_mk3_mk4_remove(dev, CW_NAME_MK3);
+	cw_hardware_mk3_mk4_remove(dev, CW_NAME_MK3);
 	}
 
 
 
 /****************************************************************************
- * cwhardware_mk3_probe
+ * cw_hardware_mk3_probe
  ****************************************************************************/
 static int
-cwhardware_mk3_probe(
+cw_hardware_mk3_probe(
 	struct pci_dev			*dev,
 	const struct pci_device_id	*id)
 
@@ -241,7 +261,7 @@ cwhardware_mk3_probe(
 	int				result;
 	struct cw_hardware		*hrd;
 
-	result = cwhardware_mk3_mk4_probe(dev, id, CW_HARDWARE_MODEL_MK3, CW_NAME_MK3);
+	result = cw_hardware_mk3_mk4_probe(dev, id, CW_HARDWARE_MODEL_MK3, CW_NAME_MK3);
 	if (result < 0) return (result);
 	hrd = (struct cw_hardware *) pci_get_drvdata(dev);
 
@@ -258,16 +278,16 @@ cwhardware_mk3_probe(
 
 	/* all went fine controller is ready */
 
-	cw_register_hardware(hrd);
+	cw_driver_register_hardware(hrd);
 	return (0);
 	}
 
 
 
 /****************************************************************************
- * cwhardware_mk3_pci_ids
+ * cw_hardware_mk3_pci_ids
  ****************************************************************************/
-static struct pci_device_id		cwhardware_mk3_pci_ids[] =
+static struct pci_device_id		cw_hardware_mk3_pci_ids[] =
 	{
 		{
 		.vendor    = 0xe159,
@@ -281,71 +301,138 @@ static struct pci_device_id		cwhardware_mk3_pci_ids[] =
 
 /* multiple MODULE_DEVICE_TABLE entries seem to cause problems with 2.4 */
 
-MODULE_DEVICE_TABLE(pci, cwhardware_mk3_pci_ids);
+MODULE_DEVICE_TABLE(pci, cw_hardware_mk3_pci_ids);
 #endif /* LINUX_VERSION_CODE */
 
 
 
 /****************************************************************************
- * cwhardware_mk3_pci_driver
+ * cw_hardware_mk3_pci_driver
  ****************************************************************************/
-struct pci_driver			cwhardware_mk3_pci_driver =
+struct pci_driver			cw_hardware_mk3_pci_driver =
 	{
 	.name     = CW_NAME_MK3,
-	.id_table = cwhardware_mk3_pci_ids,
-	.probe    = cwhardware_mk3_probe,
-	.remove   = cwhardware_mk3_remove
+	.id_table = cw_hardware_mk3_pci_ids,
+	.probe    = cw_hardware_mk3_probe,
+	.remove   = cw_hardware_mk3_remove
 	};
 
 
 
 /****************************************************************************
- * cwhardware_mk4_remove
+ * cw_hardware_mk4_remove
  ****************************************************************************/
 static void
-cwhardware_mk4_remove(
+cw_hardware_mk4_remove(
 	struct pci_dev			*dev)
 
 	{
-	cwhardware_mk3_mk4_remove(dev, CW_NAME_MK4);
+	cw_hardware_mk3_mk4_remove(dev, CW_NAME_MK4);
 	}
 
 
 
 /****************************************************************************
- * cwhardware_mk4_firmware
+ * cw_hardware_mk4_firmware
  ****************************************************************************/
-static unsigned char __devinitdata	cwhardware_mk4_firmware[] =
+static unsigned char 			cw_hardware_mk4_firmware[] =
 	{
-#include "cwfirmware.c"
+#include "firmware.c"
 	};
 
 
 
 /****************************************************************************
- * cwhardware_mk4_firmware_upload
+ * cw_hardware_mk4_firmware_versions
+ ****************************************************************************/
+const static struct cw_hardware_firmware	cw_hardware_mk4_firmware_versions[] =
+	{
+		{
+		.id     = "pre release 29",
+		.size   = 59215,
+		.offset = 0,
+		.crc16  = 0x619c,
+		.flags  = CW_HARDWARE_FLAG_NONE
+		},
+		{
+		.id     = "pre release 29",
+		.size   = 59217,
+		.offset = 2,
+		.crc16  = 0xab03,
+		.flags  = CW_HARDWARE_FLAG_NONE
+		},
+		{
+		.id     = "release 2 fix 2",
+		.size   = 59217,
+		.offset = 0,
+		.crc16  = 0x86ca,
+		.flags  = CW_HARDWARE_FLAG_WPULSE_LENGTH
+		},
+		{ .id   = NULL }
+	};
+
+
+
+/****************************************************************************
+ * cw_hardware_mk4_firmware_crc16
  ****************************************************************************/
 static int
-cwhardware_mk4_firmware_upload(
+cw_hardware_mk4_firmware_crc16(
+	int				initval,
+	const unsigned char		*data,
+	int				size)
+
+	{
+	int				byte, table;
+	static const int		lookup[16] =
+		{
+		0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
+		0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF
+		};
+
+	/* x^16 + x^12 + x^5 + x^0 = 0x1021 (x^16 is left out) */
+
+	while (size-- > 0)
+		{
+		byte    = *data++;
+		table   = lookup[((byte >> 4) ^ (initval >> 12)) & 0x0f];
+		initval = (initval << 4) ^ table;
+		table   = lookup[(byte ^ (initval >> 12)) & 0x0f];
+		initval = (initval << 4) ^ table;
+		}
+	return (initval & 0xffff);
+	}
+
+
+
+/****************************************************************************
+ * cw_hardware_mk4_firmware_upload
+ ****************************************************************************/
+static int
+cw_hardware_mk4_firmware_upload(
 	struct cw_hardware		*hrd)
 
 	{
-	int				byte, bank, timeout;
-	int				i = 0, version = 0xffff;
+	int				crc16, size, byte, bank, timeout;
+	int				i = 0, v;
 	unsigned char			memtest[] =
 		{
 		1, 2, 4, 8, 16, 32, 64, 128, 255, 44, 65, 3
 		};
+	const struct cw_hardware_firmware	*versions = cw_hardware_mk4_firmware_versions;
 
-	/*
-	 * determine firmware version, no version available if first bytes
-	 * are 0xffff
-	 */
+	/* lookup firmware version */
 
-	if (sizeof (cwhardware_mk4_firmware) > 1)
+	size  = sizeof (cw_hardware_mk4_firmware);
+	crc16 = cw_hardware_mk4_firmware_crc16(0x0000, cw_hardware_mk4_firmware, size);
+	cw_debug(1, "[c%d] looking up firmware version (size=%d, crc16=0x%04x)", hrd->cnt->num, size, crc16);
+	for (v = 0; ; v++)
 		{
-		version = (cwhardware_mk4_firmware[0] << 8) | cwhardware_mk4_firmware[1];
-		if (version != 0xffff) i = 2;
+		if (versions[v].id == NULL) return (-EBUSY);
+		if (versions[v].size != size) continue;
+		if (versions[v].crc16 != crc16) continue;
+		hrd->flags = versions[v].flags;
+		break;
 		}
 
 	/*
@@ -353,13 +440,13 @@ cwhardware_mk4_firmware_upload(
 	 * cw_probe()-function
 	 */
 
-	cw_debug(1, "[c%d] uploading firmware version 0x%04x", hrd->cnt->num, version);
-	for ( ; i < sizeof (cwhardware_mk4_firmware); i++)
+	cw_notice("[c%d] uploading firmware '%s'", hrd->cnt->num, versions[v].id);
+	for (i = versions[v].offset ; i < versions[v].size; i++)
 		{
 
 		/* set direction */
 
-		byte = cwhardware_mk4_firmware[i];
+		byte = cw_hardware_mk4_firmware[i];
 		bank = (byte & 1) ? CW_MK4_BANK_COMPAT_MUX_ON + 2 : CW_MK4_BANK_COMPAT_MUX_ON;
 		outb(bank, get_reg(SELECTBANK));
 
@@ -375,7 +462,7 @@ cwhardware_mk4_firmware_upload(
 
 		outb(byte, get_reg(JOYDAT));
 		}
-	cw_debug(1, "[c%d] uploaded %d bytes", hrd->cnt->num, i);
+	cw_debug(1, "[c%d] uploaded %d bytes", hrd->cnt->num, versions[v].size - versions[v].offset);
 
 	/* now wait until FPGA really comes alive */
 
@@ -402,10 +489,10 @@ cwhardware_mk4_firmware_upload(
 
 
 /****************************************************************************
- * cwhardware_mk4_probe
+ * cw_hardware_mk4_probe
  ****************************************************************************/
 static int
-cwhardware_mk4_probe(
+cw_hardware_mk4_probe(
 	struct pci_dev			*dev,
 	const struct pci_device_id	*id)
 
@@ -413,7 +500,7 @@ cwhardware_mk4_probe(
 	int				result;
 	struct cw_hardware		*hrd;
 
-	result = cwhardware_mk3_mk4_probe(dev, id, CW_HARDWARE_MODEL_MK4, CW_NAME_MK4);
+	result = cw_hardware_mk3_mk4_probe(dev, id, CW_HARDWARE_MODEL_MK4, CW_NAME_MK4);
 	if (result < 0) return (result);
 	hrd = (struct cw_hardware *) pci_get_drvdata(dev);
 
@@ -438,11 +525,11 @@ cwhardware_mk4_probe(
 
 	/* upload firmware */
 
-	result = cwhardware_mk4_firmware_upload(hrd);
+	result = cw_hardware_mk4_firmware_upload(hrd);
 	if (result < 0)
 		{
 		cw_error("[c%d] error while uploading firmware", hrd->cnt->num);
-		cwhardware_mk4_remove(dev);
+		cw_hardware_mk4_remove(dev);
 		return (result);
 		}
 
@@ -453,16 +540,16 @@ cwhardware_mk4_probe(
 
 	/* all went fine controller is ready */
 
-	cw_register_hardware(hrd);
+	cw_driver_register_hardware(hrd);
 	return (0);
 	}
 
 
 
 /****************************************************************************
- * cwhardware_mk4_pci_ids
+ * cw_hardware_mk4_pci_ids
  ****************************************************************************/
-static struct pci_device_id		cwhardware_mk4_pci_ids[] =
+static struct pci_device_id		cw_hardware_mk4_pci_ids[] =
 	{
 
 		/*
@@ -488,33 +575,33 @@ static struct pci_device_id		cwhardware_mk4_pci_ids[] =
 
 /* multiple MODULE_DEVICE_TABLE entries seem to cause problems with 2.4 */
 
-MODULE_DEVICE_TABLE(pci, cwhardware_mk4_pci_ids);
+MODULE_DEVICE_TABLE(pci, cw_hardware_mk4_pci_ids);
 #endif /* LINUX_VERSION_CODE */
 
 
 
 /****************************************************************************
- * cwhardware_mk4_pci_driver
+ * cw_hardware_mk4_pci_driver
  ****************************************************************************/
-struct pci_driver			cwhardware_mk4_pci_driver =
+struct pci_driver			cw_hardware_mk4_pci_driver =
 	{
 	.name     = CW_NAME_MK4,
-	.id_table = cwhardware_mk4_pci_ids,
-	.probe    = cwhardware_mk4_probe,
-	.remove   = cwhardware_mk4_remove
+	.id_table = cw_hardware_mk4_pci_ids,
+	.probe    = cw_hardware_mk4_probe,
+	.remove   = cw_hardware_mk4_remove
 	};
 #endif /* CONFIG_PCI */
 
 
 
 /****************************************************************************
- * cwhardware_floppy_control_register
+ * cw_hardware_floppy_control_register
  ****************************************************************************/
-#define cntr_reg(bit, set)		cwhardware_floppy_control_register(hrd, bit, set, 0)
-#define cntr_reg_out(bit, set)		cwhardware_floppy_control_register(hrd, bit, set, 1)
+#define cntr_reg(bit, set)		cw_hardware_floppy_control_register(hrd, bit, set, 0)
+#define cntr_reg_out(bit, set)		cw_hardware_floppy_control_register(hrd, bit, set, 1)
 
 static void
-cwhardware_floppy_control_register(
+cw_hardware_floppy_control_register(
 	struct cw_hardware		*hrd,
 	int				bit,
 	int				set,
@@ -550,10 +637,32 @@ cwhardware_floppy_control_register(
 
 
 /****************************************************************************
- * cwhardware_floppy_host_select
+ * cw_hardware_wpulse_length
+ ****************************************************************************/
+static int
+cw_hardware_wpulse_length(
+	struct cw_hardware		*hrd,
+	cw_psecs_t			wpulse_length)
+
+	{
+	cw_count_t			i = 0;
+
+	if (hrd->flags & CW_HARDWARE_FLAG_WPULSE_LENGTH)
+		{
+		if (wpulse_length < CW_MIN_WPULSE_LENGTH) wpulse_length = CW_MIN_WPULSE_LENGTH;
+		if (wpulse_length > CW_MAX_WPULSE_LENGTH) wpulse_length = CW_MAX_WPULSE_LENGTH;
+		i = wpulse_length / CW_WPULSE_LENGTH_MULTIPLIER;
+		}
+	return (i);
+	}
+
+
+
+/****************************************************************************
+ * cw_hardware_floppy_host_select
  ****************************************************************************/
 int
-cwhardware_floppy_host_select(
+cw_hardware_floppy_host_select(
 	struct cw_hardware		*hrd)
 
 	{
@@ -570,10 +679,10 @@ cwhardware_floppy_host_select(
 
 
 /****************************************************************************
- * cwhardware_floppy_mux_on
+ * cw_hardware_floppy_mux_on
  ****************************************************************************/
 void
-cwhardware_floppy_mux_on(
+cw_hardware_floppy_mux_on(
 	struct cw_hardware		*hrd)
 
 	{
@@ -585,10 +694,10 @@ cwhardware_floppy_mux_on(
 
 
 /****************************************************************************
- * cwhardware_floppy_mux_off
+ * cw_hardware_floppy_mux_off
  ****************************************************************************/
 void
-cwhardware_floppy_mux_off(
+cw_hardware_floppy_mux_off(
 	struct cw_hardware		*hrd)
 
 	{
@@ -600,10 +709,10 @@ cwhardware_floppy_mux_off(
 
 
 /****************************************************************************
- * cwhardware_floppy_motor_on
+ * cw_hardware_floppy_motor_on
  ****************************************************************************/
 void
-cwhardware_floppy_motor_on(
+cw_hardware_floppy_motor_on(
 	struct cw_hardware		*hrd,
 	int				floppy)
 
@@ -615,10 +724,10 @@ cwhardware_floppy_motor_on(
 
 
 /****************************************************************************
- * cwhardware_floppy_motor_off
+ * cw_hardware_floppy_motor_off
  ****************************************************************************/
 void
-cwhardware_floppy_motor_off(
+cw_hardware_floppy_motor_off(
 	struct cw_hardware		*hrd,
 	int				floppy)
 
@@ -631,10 +740,10 @@ cwhardware_floppy_motor_off(
 
 
 /****************************************************************************
- * cwhardware_floppy_select
+ * cw_hardware_floppy_select
  ****************************************************************************/
 void
-cwhardware_floppy_select(
+cw_hardware_floppy_select(
 	struct cw_hardware		*hrd,
 	int				floppy,
 	int				side,
@@ -651,10 +760,10 @@ cwhardware_floppy_select(
 
 
 /****************************************************************************
- * cwhardware_floppy_step
+ * cw_hardware_floppy_step
  ****************************************************************************/
 void
-cwhardware_floppy_step(
+cw_hardware_floppy_step(
 	struct cw_hardware		*hrd,
 	int				step,
 	int				direction)
@@ -668,10 +777,10 @@ cwhardware_floppy_step(
 
 
 /****************************************************************************
- * cwhardware_floppy_track0
+ * cw_hardware_floppy_track0
  ****************************************************************************/
 int
-cwhardware_floppy_track0(
+cw_hardware_floppy_track0(
 	struct cw_hardware		*hrd)
 
 	{
@@ -684,10 +793,10 @@ cwhardware_floppy_track0(
 
 
 /****************************************************************************
- * cwhardware_floppy_write_protected
+ * cw_hardware_floppy_write_protected
  ****************************************************************************/
 int
-cwhardware_floppy_write_protected(
+cw_hardware_floppy_write_protected(
 	struct cw_hardware		*hrd)
 
 	{
@@ -700,10 +809,10 @@ cwhardware_floppy_write_protected(
 
 
 /****************************************************************************
- * cwhardware_floppy_disk_changed
+ * cw_hardware_floppy_disk_changed
  ****************************************************************************/
 int
-cwhardware_floppy_disk_changed(
+cw_hardware_floppy_disk_changed(
 	struct cw_hardware		*hrd)
 
 	{
@@ -716,10 +825,10 @@ cwhardware_floppy_disk_changed(
 
 
 /****************************************************************************
- * cwhardware_floppy_abort
+ * cw_hardware_floppy_abort
  ****************************************************************************/
 void
-cwhardware_floppy_abort(
+cw_hardware_floppy_abort(
 	struct cw_hardware		*hrd)
 
 	{
@@ -729,10 +838,10 @@ cwhardware_floppy_abort(
 
 
 /****************************************************************************
- * cwhardware_floppy_busy
+ * cw_hardware_floppy_busy
  ****************************************************************************/
 int
-cwhardware_floppy_busy(
+cw_hardware_floppy_busy(
 	struct cw_hardware		*hrd)
 
 	{
@@ -747,10 +856,10 @@ cwhardware_floppy_busy(
 
 
 /****************************************************************************
- * cwhardware_floppy_read_track_start
+ * cw_hardware_floppy_read_track_start
  ****************************************************************************/
 void
-cwhardware_floppy_read_track_start(
+cw_hardware_floppy_read_track_start(
 	struct cw_hardware		*hrd,
 	int				clock,
 	int				mode)
@@ -789,32 +898,39 @@ cwhardware_floppy_read_track_start(
 
 
 /****************************************************************************
- * cwhardware_floppy_read_track_copy
+ * cw_hardware_floppy_read_track_copy
  ****************************************************************************/
 int
-cwhardware_floppy_read_track_copy(
+cw_hardware_floppy_read_track_copy(
 	struct cw_hardware		*hrd,
-	u8				*data,
+	cw_raw_t			*data,
 	int				size)
 
 	{
 	int				i = 0, reg = get_reg(CATMEM);
-	u8				d;
+	cw_count_t			d;
 
-	/* append data end mark */
+	/*
+	 * append data end mark. there is a good reason not to use 0xff here
+	 * because 0xff could also mean (0x7f | index_pulse) when the
+	 * presence of the index pulse is stored in the msb. this would
+	 * abort reading the memory too early. (0x00 | index_pulse) should
+	 * not happen
+	 */
 
 	outb(0x80, get_reg(CATMEM));
 
 	/*
 	 * reset memory pointer and transfer from catweasel memory to
-	 * given buffer. ignore first byte in memory. if memory was full
-	 * this first byte is the data end marker and will be seen again
-	 * if the memory pointer wraps around
+	 * given buffer. ignore first byte in memory, because it does not
+	 * contain useful data. furthermore if memory was full this first
+	 * byte is the data end marker and will be seen again if the memory
+	 * pointer wraps around
 	 */
 
 	outb(0x00, get_reg(CATABORT));
 	inb(reg);
-	while ((i < size) && (i < CW_MAX_SIZE))
+	while ((i < size) && (i < CW_MAX_TRACK_SIZE))
 		{
 		d = inb(reg);
 		if (d == 0x80) break;
@@ -827,14 +943,15 @@ cwhardware_floppy_read_track_copy(
 
 
 /****************************************************************************
- * cwhardware_floppy_write_track
+ * cw_hardware_floppy_write_track
  ****************************************************************************/
 int
-cwhardware_floppy_write_track(
+cw_hardware_floppy_write_track(
 	struct cw_hardware		*hrd,
 	int				clock,
 	int				mode,
-	u8				*data,
+	cw_psecs_t			wpulse_length,
+	cw_raw_t			*data,
 	int				size)
 
 	{
@@ -848,7 +965,7 @@ cwhardware_floppy_write_track(
 
 	outb(0x00, get_reg(CATABORT));
 	for (i = 0; i < 7; i++) inb(reg);
-	for (i = 0; (i < size) && (i < CW_MAX_SIZE - CW_WRITE_OVERHEAD); i++)
+	for (i = 0; (i < size) && (i < CW_MAX_TRACK_SIZE - CW_WRITE_OVERHEAD); i++)
 		{
 
 		/*
@@ -857,7 +974,26 @@ cwhardware_floppy_write_track(
 		 */
 
 		if ((data[i] < 0x03) || (data[i] > 0x7f)) return (-EINVAL);
-		outb(0x80 - data[i], reg);
+
+		/*
+		 * values to be written have to be subtracted from 0x7f
+		 * (until cw-0.12 erroneously 0x80 was used). to quote Jens
+		 * Schoenfeld:
+		 *
+		 * "... 0x00-0x02 are supported, but I wouldn't use values
+		 * between 0x7d and 0x7f, as that would be extremely short
+		 * pulses. Remember that the internal counter always counts
+		 * up. On read, it starts counting at 0 and ends whenever a
+		 * negative pulse is detected from the drive. On a write, it
+		 * starts counting at the value you've written to memory, and
+		 * generates a write pulse whenever 0x7f is reached. On a
+		 * write, the values are 'reversed':
+		 *
+		 * On write, lower values mean longer pulses.
+		 * On read, larger values mean longer pulses. ..."
+		 */
+
+		outb(0x7f - data[i], reg);
 		}
 	outb(0xff, reg);
 	cw_debug(1, "[c%d] write track, clock = %d, mode = %d, size = %d", hrd->cnt->num, clock, mode, i);
@@ -873,7 +1009,7 @@ cwhardware_floppy_write_track(
 
 	outb(0x00, get_reg(CATABORT));
 	inb(get_reg(CATMEM));
-	outb(0x80, get_reg(CATOPTION));
+	outb(0x80 + cw_hardware_wpulse_length(hrd, wpulse_length), get_reg(CATOPTION));
 	inb(get_reg(CATMEM));
 	inb(get_reg(CATMEM));
 	inb(get_reg(CATMEM));
@@ -882,6 +1018,7 @@ cwhardware_floppy_write_track(
 	inb(get_reg(CATMEM));
 	if (mode == CW_TRACKINFO_MODE_NORMAL) outb(0x00, get_reg(CATSTARTB));
 	else outb(0x00, get_reg(CATSTARTA));
+
 	return (size);
 	}
 /******************************************************** Karsten Scheibler */

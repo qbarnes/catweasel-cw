@@ -1,4 +1,5 @@
-MAKE=make
+PREFIX:=..
+include ${PREFIX}/Makefile.conf
 
 .PHONY: all clean
 

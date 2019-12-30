@@ -13,6 +13,20 @@
 #ifndef CWTOOL_FIFO_H
 #define CWTOOL_FIFO_H
 
+#include "types.h"
+
+
+
+
+/****************************************************************************
+ *
+ * data structures and defines
+ *
+ ****************************************************************************/
+
+
+
+
 #define FIFO_INIT(d, s)			(struct fifo) { .data = d, .size = s, .limit = s }
 
 /* writable in the sense of "writable to a catweasel device" */
@@ -34,6 +48,18 @@ struct fifo
 	int				flags;
 	int				speed;
 	};
+
+
+
+
+/****************************************************************************
+ *
+ * global functions
+ *
+ ****************************************************************************/
+
+
+
 
 extern int				fifo_reset(struct fifo *);
 extern int				fifo_get_size(struct fifo *);

@@ -24,11 +24,13 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
-#include "../cwtool.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../format.h"
-#include "raw.h"
+#include "container.h"
+#include "histogram.h"
 #include "setvalue.h"
 
 
@@ -240,10 +242,12 @@ static int
 fill_statistics(
 	union format			*fmt,
 	struct fifo			*ffo_l0,
-	int				track)
+	int				cwtool_track,
+	int				format_track,
+	int				format_side)
 
 	{
-	raw_histogram(ffo_l0, track, track);
+	histogram_normal(ffo_l0, cwtool_track, -1, -1);
 	return (1);
 	}
 
@@ -255,10 +259,13 @@ fill_statistics(
 static int
 fill_read_track(
 	union format			*fmt,
+	struct container		*con,
 	struct fifo			*ffo_l0,
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	int				cwtool_track,
+	int				format_track,
+	int				format_side)
 
 	{
 	debug_error();
@@ -276,16 +283,19 @@ fill_write_track(
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
 	struct fifo			*ffo_l0,
-	int				track)
+	unsigned char			*data,
+	int				cwtool_track,
+	int				format_track,
+	int				format_side)
 
 	{
-	unsigned char			*data = fifo_get_data(ffo_l0);
+	unsigned char			*data_l0 = fifo_get_data(ffo_l0);
 	unsigned char			val = fmt->fll.wr.fill_value;
 	int				len = fmt->fll.wr.fill_length;
 
 	debug_error_condition(len > fifo_get_limit(ffo_l0));
-	if (fmt->fll.wr.mode == 1) fill_write_pattern(&fmt->fll, data, len);
-	else memset(data, val, len);
+	if (fmt->fll.wr.mode == 1) fill_write_pattern(&fmt->fll, data_l0, len);
+	else memset(data_l0, val, len);
 	fifo_set_wr_ofs(ffo_l0, len);
 	fifo_set_flags(ffo_l0, FIFO_FLAG_WRITABLE);
 	return (1);
@@ -323,11 +333,11 @@ fill_set_defaults(
 			{
 			.mode        = 0,
 			.fill_value  = 0x78,
-			.fill_length = CWTOOL_MAX_TRACK_SIZE
+			.fill_length = GLOBAL_MAX_TRACK_SIZE
 			}
 		};
 
-	debug(2, "setting defaults");
+	debug_message(GENERIC, 2, "setting defaults");
 	fmt->fll = fll;
 	}
 
@@ -344,11 +354,11 @@ fill_set_write_option(
 	int				ofs)
 
 	{
-	debug(2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_MODE) return (setvalue_uchar(&fmt->fll.wr.mode, val, 0, 0xff));
 	if (magic == MAGIC_FILL_VALUE) return (setvalue_uchar(&fmt->fll.wr.fill_value, val, 3, 0x7f));
 	debug_error_condition(magic != MAGIC_FILL_LENGTH);
-	return (setvalue_uint(&fmt->fll.wr.fill_length, val, CWTOOL_MIN_TRACK_SIZE, CWTOOL_MAX_TRACK_SIZE));
+	return (setvalue_uint(&fmt->fll.wr.fill_length, val, GLOBAL_MIN_TRACK_SIZE, GLOBAL_MAX_TRACK_SIZE));
 	}
 
 
@@ -412,6 +422,32 @@ fill_get_flags(
 
 
 /****************************************************************************
+ * fill_get_data_offset
+ ****************************************************************************/
+static int
+fill_get_data_offset(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
+ * fill_get_data_size
+ ****************************************************************************/
+static int
+fill_get_data_size(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
  * fill_write_options
  ****************************************************************************/
 static struct format_option		fill_write_options[] =
@@ -437,7 +473,7 @@ static struct format_option		fill_dummy_options[] =
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -458,6 +494,8 @@ struct format_desc			fill_format_desc =
 	.get_sectors      = fill_get_sectors,
 	.get_sector_size  = fill_get_sector_size,
 	.get_flags        = fill_get_flags,
+	.get_data_offset  = fill_get_data_offset,
+	.get_data_size    = fill_get_data_size,
 	.track_statistics = fill_statistics,
 	.track_read       = fill_read_track,
 	.track_write      = fill_write_track,

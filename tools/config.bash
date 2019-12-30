@@ -22,5 +22,6 @@ awk 'BEGIN {
 	{
 	version = sprintf("%d%02d%02d\n", $1, $2, $3);
 	if (version < 20619) print("#include <linux/config.h>");
+	else print("/* linux/config.h does not exist in 2.6.19+ */");
 	}'
 ######################################################### Karsten Scheibler #

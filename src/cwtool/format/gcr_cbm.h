@@ -10,10 +10,12 @@
 
 
 
-#ifndef CWTOOL_GCR_CBM_H
-#define CWTOOL_GCR_CBM_H
+#ifndef CWTOOL_FORMAT_GCR_CBM_H
+#define CWTOOL_FORMAT_GCR_CBM_H
 
+#include "types.h"
 #include "bounds.h"
+#include "desc.h"
 
 struct gcr_cbm
 	{
@@ -33,6 +35,8 @@ struct gcr_cbm
 		unsigned char		fill_length;
 		unsigned char		fill_value;
 		short			precomp[9];
+		unsigned long		data_offset;
+		unsigned long		data_size;
 		}			wr;
 	struct
 		{
@@ -44,17 +48,9 @@ struct gcr_cbm
 		}			rw;
 	};
 
-/*
- * do not put this include at the beginning of the file, because ../format.h
- * also includes this file to construct union format. so the above struct
- * has to be known at time of inclusion
- */
-
-#include "../format.h"
-
 extern struct format_desc		gcr_cbm_format_desc;
 
 
 
-#endif /* !CWTOOL_GCR_CBM_H */
+#endif /* !CWTOOL_FORMAT_GCR_CBM_H */
 /******************************************************** Karsten Scheibler */

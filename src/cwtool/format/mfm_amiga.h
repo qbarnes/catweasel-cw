@@ -10,10 +10,12 @@
 
 
 
-#ifndef CWTOOL_MFM_AMIGA_H
-#define CWTOOL_MFM_AMIGA_H
+#ifndef CWTOOL_FORMAT_MFM_AMIGA_H
+#define CWTOOL_FORMAT_MFM_AMIGA_H
 
+#include "types.h"
 #include "bounds.h"
+#include "desc.h"
 
 struct mfm_amiga
 	{
@@ -44,17 +46,9 @@ struct mfm_amiga
 		}			rw;
 	};
 
-/*
- * do not put this include at the beginning of the file, because ../format.h
- * also includes this file to construct union format. so the above struct
- * has to be known at time of inclusion
- */
-
-#include "../format.h"
-
 extern struct format_desc		mfm_amiga_format_desc;
 
 
 
-#endif /* !CWTOOL_MFM_AMIGA_H */
+#endif /* !CWTOOL_FORMAT_MFM_AMIGA_H */
 /******************************************************** Karsten Scheibler */

@@ -16,20 +16,19 @@
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
+#include "global.h"
+#include "options.h"
 #include "file.h"
 #include "string.h"
 
 
 
-extern struct image_desc		image_raw_desc;
-extern struct image_desc		image_g64_desc;
-extern struct image_desc		image_d64_desc;
-extern struct image_desc		image_plain_desc;
 static struct image_desc		*img_dsc[] =
 	{
 	&image_raw_desc,
 	&image_g64_desc,
 	&image_d64_desc,
+	&image_d64_noerror_desc,
 	&image_plain_desc,
 	NULL
 	};

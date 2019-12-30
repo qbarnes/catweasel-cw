@@ -25,11 +25,17 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
-#include "../cwtool.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../format.h"
-#include "raw.h"
+#include "range.h"
+#include "bitstream.h"
+#include "container.h"
+#include "match_simple.h"
+#include "postcomp_simple.h"
+#include "histogram.h"
 #include "setvalue.h"
 
 
@@ -50,6 +56,7 @@
 static int
 gcr_read_sync(
 	struct fifo			*ffo_l1,
+	struct range			*rng,
 	int				val)
 
 	{
@@ -69,7 +76,8 @@ gcr_read_sync(
 		}
 found:
 	fifo_set_rd_bitofs(ffo_l1, fifo_get_rd_bitofs(ffo_l1) - i);
-	verbose(2, "got sync at bit offset %d with value 0x%06x", fifo_get_rd_bitofs(ffo_l1) - 24, val);
+	verbose_message(GENERIC, 2, "got sync at bit offset %d with value 0x%06x", fifo_get_rd_bitofs(ffo_l1) - 24, val);
+	range_set_start(rng, fifo_get_rd_bitofs(ffo_l1) - 24);
 	return (1);
 	}
 
@@ -84,7 +92,7 @@ gcr_write_sync(
 	int				val)
 
 	{
-	verbose(2, "writing sync at bit offset %d with value 0x%06x", fifo_get_wr_bitofs(ffo_l1), val);
+	verbose_message(GENERIC, 2, "writing sync at bit offset %d with value 0x%06x", fifo_get_wr_bitofs(ffo_l1), val);
 	if (fifo_write_bits(ffo_l1, val >> 16, 8) == -1) return (-1);
 	if (fifo_write_bits(ffo_l1, val & 0xffff, 16) == -1) return (-1);
 	return (0);
@@ -102,7 +110,7 @@ gcr_write_fill(
 	int				size)
 
 	{
-	verbose(2, "writing fill at bit offset %d with value 0x%04x", fifo_get_wr_bitofs(ffo_l1), val);
+	verbose_message(GENERIC, 2, "writing fill at bit offset %d with value 0x%04x", fifo_get_wr_bitofs(ffo_l1), val);
 	while (size-- > 0) if (fifo_write_bits(ffo_l1, val, 10) == -1) return (-1);
 	return (0);
 	}
@@ -124,7 +132,7 @@ gcr_read_8header_bits(
 	if (val == -1) return (-1);
 	if ((val & 0xaaaa) != 0xaaaa)
 		{
-		verbose(3, "wrong header clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
+		verbose_message(GENERIC, 3, "wrong header clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
 		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 		}
 	return (val & (val >> 7) & 0xff);
@@ -166,7 +174,7 @@ gcr_read_header_bytes(
 		if (d == -1) return (-1);
 		data[i] = d;
 		}
-	verbose(2, "read %d header bytes at bit offset %d with", i, bitofs);
+	verbose_message(GENERIC, 2, "read %d header bytes at bit offset %d with", i, bitofs);
 	return (0);
 	}
 
@@ -184,7 +192,7 @@ gcr_write_header_bytes(
 	{
 	int				i;
 
-	verbose(2, "writing %d header bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "writing %d header bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
 	for (i = 0; i < size; i++) gcr_write_8header_bits(ffo_l1, data[i]);
 	return (0);
 	}
@@ -228,7 +236,7 @@ gcr_read_data_bytes(
 		if (r == -1) return (-1);
 		while (r < 0x80)
 			{
-			verbose(3, "need to read additional bit around bit offset %d (byte %d), because msb is 0", fifo_get_rd_bitofs(ffo_l1) - 8, i);
+			verbose_message(GENERIC, 3, "need to read additional bit around bit offset %d (byte %d), because msb is 0", fifo_get_rd_bitofs(ffo_l1) - 8, i);
 			b = fifo_read_bits(ffo_l1, 1);
 			if (b == -1) return (-1);
 			r = ((r << 1) | b) & 0xff;
@@ -237,12 +245,12 @@ gcr_read_data_bytes(
 		else j = decode[r - 0x96];
 		if (j == 0xff)
 			{
-			verbose(3, "data decode error around bit offset %d (byte %d), got 0x%02x(0x%02x)", fifo_get_rd_bitofs(ffo_l1) - 8, i, r, j);
+			verbose_message(GENERIC, 3, "data decode error around bit offset %d (byte %d), got 0x%02x(0x%02x)", fifo_get_rd_bitofs(ffo_l1) - 8, i, r, j);
 			disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 			}
 		data[i] = j;
 		}
-	verbose(2, "read %d data bytes at bit offset %d", i, bitofs);
+	verbose_message(GENERIC, 2, "read %d data bytes at bit offset %d", i, bitofs);
 	return (0);
 	}
 
@@ -271,7 +279,7 @@ gcr_write_data_bytes(
 		};
 	int				i;
 
-	verbose(2, "writing %d data bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "writing %d data bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
 	for (i = 0; i < size; i++)
 		{
 		debug_error_condition(data[i] >= 0x40);
@@ -303,7 +311,9 @@ gcr_write_data_bytes(
 #define FLAG_IGNORE_CHECKSUMS		(1 << 0)
 #define FLAG_IGNORE_TRACK_MISMATCH	(1 << 1)
 #define FLAG_IGNORE_VOLUME_ID		(1 << 2)
-#define FLAG_POSTCOMP			(1 << 3)
+#define FLAG_MATCH_SIMPLE		(1 << 3)
+#define FLAG_MATCH_SIMPLE_FIXUP		(1 << 4)
+#define FLAG_POSTCOMP_SIMPLE		(1 << 5)
 
 
 
@@ -529,15 +539,22 @@ gcr_apple_header_checksum(
 
 
 /****************************************************************************
- * gcr_apple_track_number_5inch
+ * gcr_apple_track_number
  ****************************************************************************/
-static int
-gcr_apple_track_number_5inch(
+static cw_count_t
+gcr_apple_track_number(
 	struct gcr_apple		*gcr_apl,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	return (track / gcr_apl->rw.track_step);
+	if (format_track == -1)
+		{
+		if (gcr_apl->rw.mode == 0) return (cwtool_track / gcr_apl->rw.track_step);
+		return (cwtool_track);
+		}
+	return (format_track);
 	}
 
 
@@ -550,6 +567,7 @@ gcr_apple_read_sector2(
 	struct fifo			*ffo_l1,
 	struct gcr_apple		*gcr_apl,
 	struct disk_error		*dsk_err,
+	struct range_sector		*rng_sec,
 	unsigned char			*header,
 	unsigned char			*data)
 
@@ -560,16 +578,18 @@ gcr_apple_read_sector2(
 
 	*dsk_err = (struct disk_error) { };
 	if (gcr_apl->rw.mode != 0) h = HEADER_SIZE, d = DATA_SIZE, gcr_read_func = gcr_read_data_bytes;
-	if (gcr_read_sync(ffo_l1, gcr_apl->rw.sync_value1) == -1) return (-1);
+	if (gcr_read_sync(ffo_l1, range_sector_header(rng_sec), gcr_apl->rw.sync_value1) == -1) return (-1);
 	bitofs = fifo_get_rd_bitofs(ffo_l1);
 	if (gcr_read_func(ffo_l1, dsk_err, header, h) == -1) return (-1);
 	epilog = fifo_read_bits(ffo_l1, 16);
 	disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, format_compare2("header epilogue: got 0x%04x, expected 0x%04x", epilog, 0xdeaa));
-	if (gcr_read_sync(ffo_l1, gcr_apl->rw.sync_value2) == -1) return (-1);
+	range_set_end(range_sector_header(rng_sec), fifo_get_rd_bitofs(ffo_l1));
+	if (gcr_read_sync(ffo_l1, range_sector_data(rng_sec), gcr_apl->rw.sync_value2) == -1) return (-1);
 	if (gcr_read_data_bytes(ffo_l1, dsk_err, data, d) == -1) return (-1);
 	epilog = fifo_read_bits(ffo_l1, 16);
 	disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, format_compare2("data epilogue: got 0x%04x, expected 0x%04x", epilog, 0xdeaa));
-	verbose(2, "rewinding to bit offset %d", bitofs);
+	range_set_end(range_sector_data(rng_sec), fifo_get_rd_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "rewinding to bit offset %d", bitofs);
 	fifo_set_rd_bitofs(ffo_l1, bitofs);
 	return (1);
 	}
@@ -613,27 +633,31 @@ static int
 gcr_apple_read_sector(
 	struct fifo			*ffo_l1,
 	struct gcr_apple		*gcr_apl,
+	struct container		*con,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	struct disk_error		dsk_err;
+	struct range_sector		rng_sec = RANGE_SECTOR_INIT;
 	unsigned char			header[HEADER_SIZE];
 	unsigned char			data[DATA_SIZE];
-	int				result, sector;
+	int				result, track, sector;
 	int				c, t, v;
 
-	if (gcr_apple_read_sector2(ffo_l1, gcr_apl, &dsk_err, header, data) == -1) return (-1);
+	if (gcr_apple_read_sector2(ffo_l1, gcr_apl, &dsk_err, &rng_sec, header, data) == -1) return (-1);
 
 	/* extract values depending on selected mode */
 
+	track = gcr_apple_track_number(gcr_apl, cwtool_track, format_track, format_side);
 	if (gcr_apl->rw.mode == 0)
 		{
 		v      = header[0];
 		t      = header[1];
 		sector = header[2];
 		c      = header[3];
-		track  = gcr_apple_track_number_5inch(gcr_apl, track);
 		}
 	else
 		{
@@ -647,26 +671,26 @@ gcr_apple_read_sector(
 
 	if (sector >= gcr_apl->rw.sectors)
 		{
-		verbose(1, "sector %d out of range", sector);
+		verbose_message(GENERIC, 1, "sector %d out of range", sector);
 		return (0);
 		}
-	verbose(1, "got sector %d", sector);
+	verbose_message(GENERIC, 1, "got sector %d", sector);
 
 	/* check sector quality */
 
 	result = format_compare2("header xor checksum: got 0x%02x, expected 0x%02x", c, gcr_apple_header_checksum(gcr_apl, header));
 	result += gcr_apple_unshuffle(gcr_apl, data);
-	if (result > 0) verbose(2, "checksum error on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "checksum error on sector %d", sector);
 	if (gcr_apl->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", t, track);
-	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "track mismatch on sector %d", sector);
 	if (gcr_apl->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("volume_id: got 0x%02x, expected 0x%02x", v, gcr_apl->rw.volume_id);
-	if (result > 0) verbose(2, "wrong volume_id on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "wrong volume_id on sector %d", sector);
 	if (gcr_apl->rd.flags & FLAG_IGNORE_VOLUME_ID) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
@@ -675,6 +699,8 @@ gcr_apple_read_sector(
 	 * current one
 	 */
 
+	range_sector_set_number(&rng_sec, sector);
+	if (con != NULL) container_append_range_sector(con, &rng_sec);
 	disk_set_sector_number(&dsk_sct[sector], sector);
 	if      (gcr_apl->rw.mode == 1) disk_sector_read(&dsk_sct[sector], &dsk_err, &data[13]);
 	else if (gcr_apl->rw.mode == 2) disk_sector_read(&dsk_sct[sector], &dsk_err, &data[1]);
@@ -692,18 +718,22 @@ gcr_apple_write_sector(
 	struct fifo			*ffo_l1,
 	struct gcr_apple		*gcr_apl,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	unsigned char			header[HEADER_SIZE];
 	unsigned char			data[DATA_SIZE];
+	cw_count_t			track;
 	int				sector = disk_get_sector_number(dsk_sct);
 
-	verbose(1, "writing sector %d", sector);
+	verbose_message(GENERIC, 1, "writing sector %d", sector);
+	track = gcr_apple_track_number(gcr_apl, cwtool_track, format_track, format_side);
 	if (gcr_apl->rw.mode == 0)
 		{
 		header[0] = gcr_apl->rw.volume_id;
-		header[1] = gcr_apple_track_number_5inch(gcr_apl, track);
+		header[1] = track;
 		header[2] = sector;
 		header[3] = gcr_apple_header_checksum(gcr_apl, header);
 		disk_sector_write(data, dsk_sct);
@@ -736,16 +766,49 @@ static int
 gcr_apple_statistics(
 	union format			*fmt,
 	struct fifo			*ffo_l0,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	int				xlated_track = track;
-
-	if (fmt->gcr_apl.rw.mode == 0) xlated_track = track / 4;
-	raw_histogram(ffo_l0, track, xlated_track);
-	raw_precomp_statistics(ffo_l0, fmt->gcr_apl.rw.bnd, 3);
-	if (fmt->gcr_apl.rd.flags & FLAG_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->gcr_apl.rw.bnd, 3, track, xlated_track);
+	histogram_normal(
+		ffo_l0,
+		cwtool_track,
+		gcr_apple_track_number(&fmt->gcr_apl, cwtool_track, format_track, format_side),
+		-1);
+	if (fmt->gcr_apl.rd.flags & FLAG_POSTCOMP_SIMPLE) histogram_postcomp_simple(
+		ffo_l0,
+		fmt->gcr_apl.rw.bnd,
+		3,
+		cwtool_track,
+		gcr_apple_track_number(&fmt->gcr_apl, cwtool_track, format_track, format_side),
+		-1);
 	return (1);
+	}
+
+
+
+/****************************************************************************
+ * gcr_apple_read_track2
+ ****************************************************************************/
+static void
+gcr_apple_read_track2(
+	union format			*fmt,
+	struct container		*con,
+	struct fifo			*ffo_l0,
+	struct fifo			*ffo_l3,
+	struct disk_sector		*dsk_sct,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
+
+	{
+	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+
+	if (fmt->gcr_apl.rd.flags & FLAG_POSTCOMP_SIMPLE) postcomp_simple(ffo_l0, fmt->gcr_apl.rw.bnd, 3);
+	bitstream_read(ffo_l0, &ffo_l1, fmt->gcr_apl.rw.bnd, 3);
+	while (gcr_apple_read_sector(&ffo_l1, &fmt->gcr_apl, con, dsk_sct, cwtool_track, format_track, format_side) != -1) ;
 	}
 
 
@@ -756,18 +819,35 @@ gcr_apple_statistics(
 static int
 gcr_apple_read_track(
 	union format			*fmt,
+	struct container		*con,
 	struct fifo			*ffo_l0,
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+	struct match_simple_info	mat_sim_nfo =
+		{
+		.con          = con,
+		.fmt          = fmt,
+		.ffo_l0       = ffo_l0,
+		.ffo_l3       = ffo_l3,
+		.dsk_sct      = dsk_sct,
+		.cwtool_track = cwtool_track,
+		.format_track = format_track,
+		.format_side  = format_side,
+		.bnd          = fmt->gcr_apl.rw.bnd,
+		.bnd_size     = 3,
+		.callback     = gcr_apple_read_track2,
+		.merge_two    = fmt->gcr_apl.rd.flags & FLAG_MATCH_SIMPLE,
+		.merge_all    = fmt->gcr_apl.rd.flags & FLAG_MATCH_SIMPLE,
+		.fixup        = fmt->gcr_apl.rd.flags & FLAG_MATCH_SIMPLE_FIXUP
+		};
 
-	if (fmt->gcr_apl.rd.flags & FLAG_POSTCOMP) raw_postcomp(ffo_l0, fmt->gcr_apl.rw.bnd, 3);
-	raw_read(ffo_l0, &ffo_l1, fmt->gcr_apl.rw.bnd, 3);
-	while (gcr_apple_read_sector(&ffo_l1, &fmt->gcr_apl, dsk_sct, track) != -1) ;
+	if ((fmt->gcr_apl.rd.flags & FLAG_MATCH_SIMPLE) || (options_get_output())) match_simple(&mat_sim_nfo);
+	else gcr_apple_read_track2(fmt, NULL, ffo_l0, ffo_l3, dsk_sct, cwtool_track, format_track, format_side);
 	return (1);
 	}
 
@@ -782,19 +862,22 @@ gcr_apple_write_track(
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
 	struct fifo			*ffo_l0,
-	int				track)
+	unsigned char			*data,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+	unsigned char			data_l1[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1 = FIFO_INIT(data_l1, sizeof (data_l1));
 	int				i;
 
 	if (gcr_write_fill(&ffo_l1, 0x3fc, fmt->gcr_apl.wr.prolog_length) == -1) return (0);
-	for (i = 0; i < fmt->gcr_apl.rw.sectors; i++) if (gcr_apple_write_sector(&ffo_l1, &fmt->gcr_apl, &dsk_sct[i], track) == -1) return (0);
+	for (i = 0; i < fmt->gcr_apl.rw.sectors; i++) if (gcr_apple_write_sector(&ffo_l1, &fmt->gcr_apl, &dsk_sct[i], cwtool_track, format_track, format_side) == -1) return (0);
 	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (gcr_write_fill(&ffo_l1, 0x3fc, fmt->gcr_apl.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1);
-	if (raw_write(&ffo_l1, ffo_l0, fmt->gcr_apl.rw.bnd, fmt->gcr_apl.wr.precomp, 3) == -1) return (0);
+	if (bitstream_write(&ffo_l1, ffo_l0, fmt->gcr_apl.rw.bnd, fmt->gcr_apl.wr.precomp, 3) == -1) return (0);
 	return (1);
 	}
 
@@ -813,21 +896,24 @@ gcr_apple_write_track(
 #define MAGIC_IGNORE_CHECKSUMS		1
 #define MAGIC_IGNORE_TRACK_MISMATCH	2
 #define MAGIC_IGNORE_VOLUME_ID		3
-#define MAGIC_POSTCOMP			4
-#define MAGIC_PROLOG_LENGTH		5
-#define MAGIC_EPILOG_LENGTH		6
-#define MAGIC_FILL_LENGTH1		7
-#define MAGIC_FILL_VALUE1		8
-#define MAGIC_FILL_LENGTH2		9
-#define MAGIC_FILL_VALUE2		10
-#define MAGIC_PRECOMP			11
-#define MAGIC_SECTORS			12
-#define MAGIC_VOLUME_ID			13
-#define MAGIC_MODE			14
-#define MAGIC_SYNC_VALUE1		15
-#define MAGIC_SYNC_VALUE2		16
-#define MAGIC_TRACK_STEP		17
-#define MAGIC_BOUNDS			18
+#define MAGIC_MATCH_SIMPLE		4
+#define MAGIC_MATCH_SIMPLE_FIXUP	5
+#define MAGIC_POSTCOMP_SIMPLE		6
+#define MAGIC_PROLOG_LENGTH		7
+#define MAGIC_EPILOG_LENGTH		8
+#define MAGIC_FILL_LENGTH1		9
+#define MAGIC_FILL_VALUE1		10
+#define MAGIC_FILL_LENGTH2		11
+#define MAGIC_FILL_VALUE2		12
+#define MAGIC_PRECOMP			13
+#define MAGIC_SECTORS			14
+#define MAGIC_VOLUME_ID			15
+#define MAGIC_MODE			16
+#define MAGIC_SYNC_VALUE1		17
+#define MAGIC_SYNC_VALUE2		18
+#define MAGIC_TRACK_STEP		19
+#define MAGIC_BOUNDS_OLD		20
+#define MAGIC_BOUNDS_NEW		21
 
 
 
@@ -865,14 +951,14 @@ gcr_apple_set_defaults(
 			.sync_value2   = 0xd5aaad,
 			.bnd           =
 				{
-				BOUNDS(0x0800, 0x1600, 0x2200, 0),
-				BOUNDS(0x2300, 0x2c00, 0x3800, 1),
-				BOUNDS(0x3900, 0x4200, 0x5000, 2)
+				BOUNDS_NEW(0x0800, 0x1500, 0x2200, 0),
+				BOUNDS_NEW(0x2300, 0x2b00, 0x3800, 1),
+				BOUNDS_NEW(0x3900, 0x4100, 0x5000, 2)
 				}
 			}
 		};
 
-	debug(2, "setting defaults");
+	debug_message(GENERIC, 2, "setting defaults");
 	fmt->gcr_apl = gcr_apl;
 	}
 
@@ -889,12 +975,14 @@ gcr_apple_set_read_option(
 	int				ofs)
 
 	{
-	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_IGNORE_CHECKSUMS));
 	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_IGNORE_TRACK_MISMATCH));
 	if (magic == MAGIC_IGNORE_VOLUME_ID)      return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_IGNORE_VOLUME_ID));
-	debug_error_condition(magic != MAGIC_POSTCOMP);
-	return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_POSTCOMP));
+	if (magic == MAGIC_MATCH_SIMPLE)          return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_MATCH_SIMPLE));
+	if (magic == MAGIC_MATCH_SIMPLE_FIXUP)    return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_MATCH_SIMPLE_FIXUP));
+	debug_error_condition(magic != MAGIC_POSTCOMP_SIMPLE);
+	return (setvalue_uchar_bit(&fmt->gcr_apl.rd.flags, val, FLAG_POSTCOMP_SIMPLE));
 	}
 
 
@@ -910,7 +998,7 @@ gcr_apple_set_write_option(
 	int				ofs)
 
 	{
-	debug(2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_PROLOG_LENGTH) return (setvalue_ushort(&fmt->gcr_apl.wr.prolog_length, val, 0, 0xffff));
 	if (magic == MAGIC_EPILOG_LENGTH) return (setvalue_ushort(&fmt->gcr_apl.wr.epilog_length, val, 8, 0xffff));
 	if (magic == MAGIC_FILL_LENGTH1)  return (setvalue_uchar(&fmt->gcr_apl.wr.fill_length1, val, 8, 0xff));
@@ -934,15 +1022,16 @@ gcr_apple_set_rw_option(
 	int				ofs)
 
 	{
-	debug(2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
-	if (magic == MAGIC_SECTORS)     return (setvalue_uchar(&fmt->gcr_apl.rw.sectors, val, 1, CWTOOL_MAX_SECTOR));
+	debug_message(GENERIC, 2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	if (magic == MAGIC_SECTORS)     return (setvalue_uchar(&fmt->gcr_apl.rw.sectors, val, 1, GLOBAL_NR_SECTORS));
 	if (magic == MAGIC_VOLUME_ID)   return (setvalue_uchar(&fmt->gcr_apl.rw.volume_id, val, 0, 0xff));
 	if (magic == MAGIC_MODE)        return (setvalue_uchar(&fmt->gcr_apl.rw.mode, val, 0, 0xff));
 	if (magic == MAGIC_SYNC_VALUE1) return (setvalue_uint(&fmt->gcr_apl.rw.sync_value1, val, 0, 0xffffff));
 	if (magic == MAGIC_SYNC_VALUE2) return (setvalue_uint(&fmt->gcr_apl.rw.sync_value2, val, 0, 0xffffff));
 	if (magic == MAGIC_TRACK_STEP)  return (setvalue_uchar(&fmt->gcr_apl.rw.track_step, val, 1, 4));
-	debug_error_condition(magic != MAGIC_BOUNDS);
-	return (setvalue_bounds(fmt->gcr_apl.rw.bnd, val, ofs));
+	if (magic == MAGIC_BOUNDS_OLD)  return (setvalue_bounds_old(fmt->gcr_apl.rw.bnd, val, ofs));
+	debug_error_condition(magic != MAGIC_BOUNDS_NEW);
+	return (setvalue_bounds_new(fmt->gcr_apl.rw.bnd, val, ofs));
 	}
 
 
@@ -988,7 +1077,34 @@ gcr_apple_get_flags(
 	union format			*fmt)
 
 	{
+	if (options_get_output()) return (FORMAT_FLAG_OUTPUT);
 	return (FORMAT_FLAG_NONE);
+	}
+
+
+
+/****************************************************************************
+ * gcr_apple_get_data_offset
+ ****************************************************************************/
+static int
+gcr_apple_get_data_offset(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
+ * gcr_apple_get_data_size
+ ****************************************************************************/
+static int
+gcr_apple_get_data_size(
+	union format			*fmt)
+
+	{
+	return (-1);
 	}
 
 
@@ -1001,7 +1117,10 @@ static struct format_option		gcr_apple_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("ignore_volume_id",      MAGIC_IGNORE_VOLUME_ID,      1),
-	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
+	FORMAT_OPTION_BOOLEAN("match_simple",          MAGIC_MATCH_SIMPLE,          1),
+	FORMAT_OPTION_BOOLEAN("match_simple_fixup",    MAGIC_MATCH_SIMPLE_FIXUP,    1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",              MAGIC_POSTCOMP_SIMPLE,       1),
+	FORMAT_OPTION_BOOLEAN("postcomp_simple",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_END
 	};
 
@@ -1032,8 +1151,10 @@ static struct format_option		gcr_apple_rw_options[] =
 	FORMAT_OPTION_INTEGER("mode",        MAGIC_MODE,        1),
 	FORMAT_OPTION_INTEGER("sync_value1", MAGIC_SYNC_VALUE1, 1),
 	FORMAT_OPTION_INTEGER("sync_value2", MAGIC_SYNC_VALUE2, 1),
-	FORMAT_OPTION_INTEGER("track_step",  MAGIC_TRACK_STEP,  1),
-	FORMAT_OPTION_INTEGER("bounds",      MAGIC_BOUNDS,      9),
+	FORMAT_OPTION_INTEGER_OBSOLETE("track_step",  MAGIC_TRACK_STEP,  1),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",      MAGIC_BOUNDS_OLD,  9),
+	FORMAT_OPTION_INTEGER("bounds_old",  MAGIC_BOUNDS_OLD,  9),
+	FORMAT_OPTION_INTEGER("bounds_new",  MAGIC_BOUNDS_NEW,  9),
 	FORMAT_OPTION_END
 	};
 
@@ -1042,7 +1163,7 @@ static struct format_option		gcr_apple_rw_options[] =
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -1063,6 +1184,8 @@ struct format_desc			gcr_apple_format_desc =
 	.get_sectors      = gcr_apple_get_sectors,
 	.get_sector_size  = gcr_apple_get_sector_size,
 	.get_flags        = gcr_apple_get_flags,
+	.get_data_offset  = gcr_apple_get_data_offset,
+	.get_data_size    = gcr_apple_get_data_size,
 	.track_statistics = gcr_apple_statistics,
 	.track_read       = gcr_apple_read_track,
 	.track_write      = gcr_apple_write_track,

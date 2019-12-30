@@ -26,11 +26,17 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
-#include "../cwtool.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../format.h"
-#include "raw.h"
+#include "range.h"
+#include "bitstream.h"
+#include "container.h"
+#include "match_simple.h"
+#include "postcomp_simple.h"
+#include "histogram.h"
 #include "setvalue.h"
 
 
@@ -51,6 +57,7 @@
 static int
 gcr_read_sync(
 	struct fifo			*ffo_l1,
+	struct range			*rng,
 	int				size)
 
 	{
@@ -77,7 +84,8 @@ gcr_read_sync(
 		}
 found:
 	fifo_set_rd_bitofs(ffo_l1, fifo_get_rd_bitofs(ffo_l1) - j);
-	verbose(2, "got sync at bit offset %d with %d bits", fifo_get_rd_bitofs(ffo_l1) - i, i);
+	verbose_message(GENERIC, 2, "got sync at bit offset %d with %d bits", fifo_get_rd_bitofs(ffo_l1) - i, i);
+	range_set_start(rng, fifo_get_rd_bitofs(ffo_l1) - i);
 	return (i);
 	}
 
@@ -94,7 +102,7 @@ gcr_write_sync(
 	{
 	int				i, val;
 
-	verbose(2, "writing sync at bit offset %d with %d bits", fifo_get_wr_bitofs(ffo_l1), size);
+	verbose_message(GENERIC, 2, "writing sync at bit offset %d with %d bits", fifo_get_wr_bitofs(ffo_l1), size);
 	for (; size > 0; size -= i)
 		{
 		i = (size > 16) ? 16 : size;
@@ -116,7 +124,7 @@ gcr_write_fill(
 	int				size)
 
 	{
-	verbose(2, "writing fill at bit offset %d with value 0x%02x", fifo_get_wr_bitofs(ffo_l1), val);
+	verbose_message(GENERIC, 2, "writing fill at bit offset %d with value 0x%02x", fifo_get_wr_bitofs(ffo_l1), val);
 	while (size-- > 0) if (fifo_write_bits(ffo_l1, val, 8) == -1) return (-1);
 	return (0);
 	}
@@ -152,12 +160,12 @@ gcr_read_bytes(
 		if (n2 == -1) return (-1);
 		if ((decode[n1] == 0xff) || (decode[n2] == 0xff))
 			{
-			verbose(3, "gcr decode error around bit offset %d (byte %d), got nybbles 0x%02x 0x%02x", fifo_get_rd_bitofs(ffo_l1) - 10, i, n1, n2);
+			verbose_message(GENERIC, 3, "gcr decode error around bit offset %d (byte %d), got nybbles 0x%02x 0x%02x", fifo_get_rd_bitofs(ffo_l1) - 10, i, n1, n2);
 			disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 			}
 		data[i] = (decode[n1] << 4) | decode[n2];
 		}
-	verbose(2, "read %d bytes at bit offset %d", i, bitofs);
+	verbose_message(GENERIC, 2, "read %d bytes at bit offset %d", i, bitofs);
 	return (0);
 	}
 
@@ -180,7 +188,7 @@ gcr_write_bytes(
 		};
 	int				i, n1, n2;
 
-	verbose(2, "writing %d bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "writing %d bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
 	for (i = 0; i < size; i++)
 		{
 		n1 = (data[i] >> 4) & 0x0f;
@@ -219,7 +227,9 @@ gcr_write_bytes(
 #define FLAG_IGNORE_CHECKSUMS		(1 << 0)
 #define FLAG_IGNORE_TRACK_MISMATCH	(1 << 1)
 #define FLAG_IGNORE_DATA_ID		(1 << 2)
-#define FLAG_POSTCOMP			(1 << 3)
+#define FLAG_MATCH_SIMPLE		(1 << 3)
+#define FLAG_MATCH_SIMPLE_FIXUP		(1 << 4)
+#define FLAG_POSTCOMP_SIMPLE		(1 << 5)
 
 
 
@@ -243,13 +253,16 @@ gcr_cbm_checksum(
 /****************************************************************************
  * gcr_cbm_track_number
  ****************************************************************************/
-static int
+static cw_count_t
 gcr_cbm_track_number(
 	struct gcr_cbm			*gcr_cbm,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	return ((track / gcr_cbm->rw.track_step) + 1);
+	if (format_track == -1) return ((cwtool_track / gcr_cbm->rw.track_step) + 1);
+	return (format_track);
 	}
 
 
@@ -262,6 +275,7 @@ gcr_cbm_read_sector2(
 	struct fifo			*ffo_l1,
 	struct gcr_cbm			*gcr_cbm,
 	struct disk_error		*dsk_err,
+	struct range_sector		*rng_sec,
 	unsigned char			*header,
 	unsigned char			*data)
 
@@ -271,15 +285,17 @@ gcr_cbm_read_sector2(
 	while (1)
 		{
 		*dsk_err = (struct disk_error) { };
-		if (gcr_read_sync(ffo_l1, gcr_cbm->rd.sync_length) == -1) return (-1);
+		if (gcr_read_sync(ffo_l1, range_sector_header(rng_sec), gcr_cbm->rd.sync_length) == -1) return (-1);
 		bitofs = fifo_get_rd_bitofs(ffo_l1);
 		if (gcr_read_bytes(ffo_l1, dsk_err, header, HEADER_READ_SIZE) == -1) return (-1);
+		range_set_end(range_sector_header(rng_sec), fifo_get_rd_bitofs(ffo_l1));
 		fifo_set_rd_bitofs(ffo_l1, bitofs);
 		if (format_compare2("header_id: got 0x%02x, expected 0x%02x", header[0], gcr_cbm->rw.header_id) == 0) break;
 		}
-	if (gcr_read_sync(ffo_l1, gcr_cbm->rd.sync_length) == -1) return (-1);
+	if (gcr_read_sync(ffo_l1, range_sector_data(rng_sec), gcr_cbm->rd.sync_length) == -1) return (-1);
 	if (gcr_read_bytes(ffo_l1, dsk_err, data, DATA_READ_SIZE) == -1) return (-1);
-	verbose(2, "rewinding to bit offset %d", bitofs);
+	range_set_end(range_sector_data(rng_sec), fifo_get_rd_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "rewinding to bit offset %d", bitofs);
 	fifo_set_rd_bitofs(ffo_l1, bitofs);
 	return (1);
 	}
@@ -315,43 +331,47 @@ static int
 gcr_cbm_read_sector(
 	struct fifo			*ffo_l1,
 	struct gcr_cbm			*gcr_cbm,
+	struct container		*con,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	struct disk_error		dsk_err;
+	struct range_sector		rng_sec = RANGE_SECTOR_INIT;
 	unsigned char			header[HEADER_SIZE];
 	unsigned char			data[DATA_SIZE];
-	int				result, sector;
+	int				result, track, sector;
 
-	if (gcr_cbm_read_sector2(ffo_l1, gcr_cbm, &dsk_err, header, data) == -1) return (-1);
+	if (gcr_cbm_read_sector2(ffo_l1, gcr_cbm, &dsk_err, &rng_sec, header, data) == -1) return (-1);
 
 	/* accept only valid sector numbers */
 
 	sector = header[2];
-	track  = gcr_cbm_track_number(gcr_cbm, track);
+	track  = gcr_cbm_track_number(gcr_cbm, cwtool_track, format_track, format_side);
 	if (sector >= gcr_cbm->rw.sectors)
 		{
-		verbose(1, "sector %d out of range", sector);
+		verbose_message(GENERIC, 1, "sector %d out of range", sector);
 		return (0);
 		}
-	verbose(1, "got sector %d", sector);
+	verbose_message(GENERIC, 1, "got sector %d", sector);
 
 	/* check sector quality */
 
 	result = format_compare2("header xor checksum: got 0x%02x, expected 0x%02x", header[1], gcr_cbm_checksum(&header[2], HEADER_READ_SIZE - 2));
 	result += format_compare2("data xor checksum: got 0x%02x, expected 0x%02x", data[257], gcr_cbm_checksum(&data[1], DATA_READ_SIZE - 2));
-	if (result > 0) verbose(2, "checksum error on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "checksum error on sector %d", sector);
 	if (gcr_cbm->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", header[3], track);
-	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "track mismatch on sector %d", sector);
 	if (gcr_cbm->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("data_id: got 0x%02x, expected 0x%02x", data[0], gcr_cbm->rw.data_id);
-	if (result > 0) verbose(2, "wrong data_id on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "wrong data_id on sector %d", sector);
 	if (gcr_cbm->rd.flags & FLAG_IGNORE_DATA_ID) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
@@ -360,6 +380,8 @@ gcr_cbm_read_sector(
 	 * current one
 	 */
 
+	range_sector_set_number(&rng_sec, sector);
+	if (con != NULL) container_append_range_sector(con, &rng_sec);
 	disk_set_sector_number(&dsk_sct[sector], sector);
 	disk_sector_read(&dsk_sct[sector], &dsk_err, &data[1]);
 	return (1);
@@ -375,19 +397,22 @@ gcr_cbm_write_sector(
 	struct fifo			*ffo_l1,
 	struct gcr_cbm			*gcr_cbm,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	unsigned char			*id,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	unsigned char			header[HEADER_SIZE];
 	unsigned char			data[DATA_SIZE];
 	int				sector = disk_get_sector_number(dsk_sct);
 
-	verbose(1, "writing sector %d", sector);
+	verbose_message(GENERIC, 1, "writing sector %d with id 0x%02x 0x%02x", sector, id[0], id[1]);
 	header[0] = gcr_cbm->rw.header_id;
 	header[2] = sector;
-	header[3] = gcr_cbm_track_number(gcr_cbm, track);
-	header[4] = 0x30;
-	header[5] = 0x30;
+	header[3] = gcr_cbm_track_number(gcr_cbm, cwtool_track, format_track, format_side);
+	header[4] = id[0];
+	header[5] = id[1];
 	header[6] = 0x0f;
 	header[7] = 0x0f;
 	header[1] = gcr_cbm_checksum(&header[2], 6);
@@ -408,13 +433,49 @@ static int
 gcr_cbm_statistics(
 	union format			*fmt,
 	struct fifo			*ffo_l0,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	raw_histogram(ffo_l0, track, gcr_cbm_track_number(&fmt->gcr_cbm, track));
-	raw_precomp_statistics(ffo_l0, fmt->gcr_cbm.rw.bnd, 3);
-	if (fmt->gcr_cbm.rd.flags & FLAG_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->gcr_cbm.rw.bnd, 3, track, gcr_cbm_track_number(&fmt->gcr_cbm, track));
+	histogram_normal(
+		ffo_l0,
+		cwtool_track,
+		gcr_cbm_track_number(&fmt->gcr_cbm, cwtool_track, format_track, format_side),
+		-1);
+	if (fmt->gcr_cbm.rd.flags & FLAG_POSTCOMP_SIMPLE) histogram_postcomp_simple(
+		ffo_l0,
+		fmt->gcr_cbm.rw.bnd,
+		3,
+		cwtool_track,
+		gcr_cbm_track_number(&fmt->gcr_cbm, cwtool_track, format_track, format_side),
+		-1);
 	return (1);
+	}
+
+
+
+/****************************************************************************
+ * gcr_cbm_read_track2
+ ****************************************************************************/
+static void
+gcr_cbm_read_track2(
+	union format			*fmt,
+	struct container		*con,
+	struct fifo			*ffo_l0,
+	struct fifo			*ffo_l3,
+	struct disk_sector		*dsk_sct,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
+
+	{
+	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+
+	if (fmt->gcr_cbm.rd.flags & FLAG_POSTCOMP_SIMPLE) postcomp_simple(ffo_l0, fmt->gcr_cbm.rw.bnd, 3);
+	bitstream_read(ffo_l0, &ffo_l1, fmt->gcr_cbm.rw.bnd, 3);
+	while (gcr_cbm_read_sector(&ffo_l1, &fmt->gcr_cbm, con, dsk_sct, cwtool_track, format_track, format_side) != -1) ;
 	}
 
 
@@ -425,18 +486,35 @@ gcr_cbm_statistics(
 static int
 gcr_cbm_read_track(
 	union format			*fmt,
+	struct container		*con,
 	struct fifo			*ffo_l0,
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+	struct match_simple_info	mat_sim_nfo =
+		{
+		.con          = con,
+		.fmt          = fmt,
+		.ffo_l0       = ffo_l0,
+		.ffo_l3       = ffo_l3,
+		.dsk_sct      = dsk_sct,
+		.cwtool_track = cwtool_track,
+		.format_track = format_track,
+		.format_side  = format_side,
+		.bnd          = fmt->gcr_cbm.rw.bnd,
+		.bnd_size     = 3,
+		.callback     = gcr_cbm_read_track2,
+		.merge_two    = fmt->gcr_cbm.rd.flags & FLAG_MATCH_SIMPLE,
+		.merge_all    = fmt->gcr_cbm.rd.flags & FLAG_MATCH_SIMPLE,
+		.fixup        = fmt->gcr_cbm.rd.flags & FLAG_MATCH_SIMPLE_FIXUP
+		};
 
-	if (fmt->gcr_cbm.rd.flags & FLAG_POSTCOMP) raw_postcomp(ffo_l0, fmt->gcr_cbm.rw.bnd, 3);
-	raw_read(ffo_l0, &ffo_l1, fmt->gcr_cbm.rw.bnd, 3);
-	while (gcr_cbm_read_sector(&ffo_l1, &fmt->gcr_cbm, dsk_sct, track) != -1) ;
+	if ((fmt->gcr_cbm.rd.flags & FLAG_MATCH_SIMPLE) || (options_get_output())) match_simple(&mat_sim_nfo);
+	else gcr_cbm_read_track2(fmt, NULL, ffo_l0, ffo_l3, dsk_sct, cwtool_track, format_track, format_side);
 	return (1);
 	}
 
@@ -451,19 +529,24 @@ gcr_cbm_write_track(
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
 	struct fifo			*ffo_l0,
-	int				track)
+	unsigned char			*data,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
+	unsigned char			id[2] = { 0x30, 0x30 };
+	unsigned char			data_l1[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1 = FIFO_INIT(data_l1, sizeof (data_l1));
 	int				i;
 
+	if (data != NULL) id[0] = data[0], id[1] = data[1];
 	if (gcr_write_fill(&ffo_l1, fmt->gcr_cbm.wr.prolog_value, fmt->gcr_cbm.wr.prolog_length) == -1) return (0);
-	for (i = 0; i < fmt->gcr_cbm.rw.sectors; i++) if (gcr_cbm_write_sector(&ffo_l1, &fmt->gcr_cbm, &dsk_sct[i], track) == -1) return (0);
+	for (i = 0; i < fmt->gcr_cbm.rw.sectors; i++) if (gcr_cbm_write_sector(&ffo_l1, &fmt->gcr_cbm, &dsk_sct[i], id, cwtool_track, format_track, format_side) == -1) return (0);
 	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (gcr_write_fill(&ffo_l1, fmt->gcr_cbm.wr.epilog_value, fmt->gcr_cbm.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1);
-	if (raw_write(&ffo_l1, ffo_l0, fmt->gcr_cbm.rw.bnd, fmt->gcr_cbm.wr.precomp, 3) == -1) return (0);
+	if (bitstream_write(&ffo_l1, ffo_l0, fmt->gcr_cbm.rw.bnd, fmt->gcr_cbm.wr.precomp, 3) == -1) return (0);
 	return (1);
 	}
 
@@ -483,17 +566,20 @@ gcr_cbm_write_track(
 #define MAGIC_IGNORE_CHECKSUMS		2
 #define MAGIC_IGNORE_TRACK_MISMATCH	3
 #define MAGIC_IGNORE_DATA_ID		4
-#define MAGIC_POSTCOMP			5
-#define MAGIC_PROLOG_LENGTH		6
-#define MAGIC_EPILOG_LENGTH		7
-#define MAGIC_FILL_LENGTH		8
-#define MAGIC_FILL_VALUE		9
-#define MAGIC_PRECOMP			10
-#define MAGIC_SECTORS			11
-#define MAGIC_HEADER_ID			12
-#define MAGIC_DATA_ID			13
-#define MAGIC_TRACK_STEP		14
-#define MAGIC_BOUNDS			15
+#define MAGIC_MATCH_SIMPLE		5
+#define MAGIC_MATCH_SIMPLE_FIXUP	6
+#define MAGIC_POSTCOMP_SIMPLE		7
+#define MAGIC_PROLOG_LENGTH		8
+#define MAGIC_EPILOG_LENGTH		9
+#define MAGIC_FILL_LENGTH		10
+#define MAGIC_FILL_VALUE		11
+#define MAGIC_PRECOMP			12
+#define MAGIC_SECTORS			13
+#define MAGIC_HEADER_ID			14
+#define MAGIC_DATA_ID			15
+#define MAGIC_TRACK_STEP		16
+#define MAGIC_BOUNDS_OLD		17
+#define MAGIC_BOUNDS_NEW		18
 
 
 
@@ -521,7 +607,9 @@ gcr_cbm_set_defaults(
 			.sync_length   = 40,
 			.fill_length   = 8,
 			.fill_value    = 0x55,
-			.precomp       = { }
+			.precomp       = { },
+			.data_offset   = 0x165a2,
+			.data_size     = 2
 			},
 		.rw =
 			{
@@ -531,14 +619,14 @@ gcr_cbm_set_defaults(
 			.track_step = 4,
 			.bnd        =
 				{
-				BOUNDS(0x0800, 0x1300, 0x1c00, 0),
-				BOUNDS(0x1d00, 0x2600, 0x2f00, 1),
-				BOUNDS(0x3000, 0x3900, 0x5000, 2)
+				BOUNDS_NEW(0x0f00, 0x1200, 0x1c00, 0),
+				BOUNDS_NEW(0x1d00, 0x2500, 0x2f00, 1),
+				BOUNDS_NEW(0x3000, 0x3800, 0x4800, 2)
 				}
 			}
 		};
 
-	debug(2, "setting defaults");
+	debug_message(GENERIC, 2, "setting defaults");
 	fmt->gcr_cbm = gcr_cbm;
 	}
 
@@ -555,13 +643,15 @@ gcr_cbm_set_read_option(
 	int				ofs)
 
 	{
-	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_SYNC_LENGTH)           return (setvalue_ushort(&fmt->gcr_cbm.rd.sync_length, val, 9, 0x400));
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_CHECKSUMS));
 	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_TRACK_MISMATCH));
 	if (magic == MAGIC_IGNORE_DATA_ID)        return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_DATA_ID));
-	debug_error_condition(magic != MAGIC_POSTCOMP);
-	return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_POSTCOMP));
+	if (magic == MAGIC_MATCH_SIMPLE)          return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_MATCH_SIMPLE));
+	if (magic == MAGIC_MATCH_SIMPLE_FIXUP)    return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_MATCH_SIMPLE_FIXUP));
+	debug_error_condition(magic != MAGIC_POSTCOMP_SIMPLE);
+	return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_POSTCOMP_SIMPLE));
 	}
 
 
@@ -577,7 +667,7 @@ gcr_cbm_set_write_option(
 	int				ofs)
 
 	{
-	debug(2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_PROLOG_LENGTH) return (setvalue_ushort(&fmt->gcr_cbm.wr.prolog_length, val, 0, 0xffff));
 	if (magic == MAGIC_EPILOG_LENGTH) return (setvalue_ushort(&fmt->gcr_cbm.wr.epilog_length, val, 8, 0xffff));
 	if (magic == MAGIC_SYNC_LENGTH)   return (setvalue_ushort(&fmt->gcr_cbm.wr.sync_length, val, 9, 0x400));
@@ -600,13 +690,14 @@ gcr_cbm_set_rw_option(
 	int				ofs)
 
 	{
-	debug(2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
-	if (magic == MAGIC_SECTORS)    return (setvalue_uchar(&fmt->gcr_cbm.rw.sectors, val, 1, CWTOOL_MAX_SECTOR));
+	debug_message(GENERIC, 2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	if (magic == MAGIC_SECTORS)    return (setvalue_uchar(&fmt->gcr_cbm.rw.sectors, val, 1, GLOBAL_NR_SECTORS));
 	if (magic == MAGIC_HEADER_ID)  return (setvalue_uchar(&fmt->gcr_cbm.rw.header_id, val, 0, 0xff));
 	if (magic == MAGIC_DATA_ID)    return (setvalue_uchar(&fmt->gcr_cbm.rw.data_id, val, 0, 0xff));
 	if (magic == MAGIC_TRACK_STEP) return (setvalue_uchar(&fmt->gcr_cbm.rw.track_step, val, 1, 4));
-	debug_error_condition(magic != MAGIC_BOUNDS);
-	return (setvalue_bounds(fmt->gcr_cbm.rw.bnd, val, ofs));
+	if (magic == MAGIC_BOUNDS_OLD) return (setvalue_bounds_old(fmt->gcr_cbm.rw.bnd, val, ofs));
+	debug_error_condition(magic != MAGIC_BOUNDS_NEW);
+	return (setvalue_bounds_new(fmt->gcr_cbm.rw.bnd, val, ofs));
 	}
 
 
@@ -648,7 +739,34 @@ gcr_cbm_get_flags(
 	union format			*fmt)
 
 	{
+	if (options_get_output()) return (FORMAT_FLAG_OUTPUT);
 	return (FORMAT_FLAG_NONE);
+	}
+
+
+
+/****************************************************************************
+ * gcr_cbm_get_data_offset
+ ****************************************************************************/
+static int
+gcr_cbm_get_data_offset(
+	union format			*fmt)
+
+	{
+	return (fmt->gcr_cbm.wr.data_offset);
+	}
+
+
+
+/****************************************************************************
+ * gcr_cbm_get_data_size
+ ****************************************************************************/
+static int
+gcr_cbm_get_data_size(
+	union format			*fmt)
+
+	{
+	return (fmt->gcr_cbm.wr.data_size);
 	}
 
 
@@ -662,7 +780,10 @@ static struct format_option		gcr_cbm_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("ignore_data_id",        MAGIC_IGNORE_DATA_ID,        1),
-	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
+	FORMAT_OPTION_BOOLEAN("match_simple",          MAGIC_MATCH_SIMPLE,          1),
+	FORMAT_OPTION_BOOLEAN("match_simple_fixup",    MAGIC_MATCH_SIMPLE_FIXUP,    1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",              MAGIC_POSTCOMP_SIMPLE,       1),
+	FORMAT_OPTION_BOOLEAN("postcomp_simple",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_END
 	};
 
@@ -691,8 +812,10 @@ static struct format_option		gcr_cbm_rw_options[] =
 	FORMAT_OPTION_INTEGER("sectors",      MAGIC_SECTORS,      1),
 	FORMAT_OPTION_INTEGER("header_id",    MAGIC_HEADER_ID,    1),
 	FORMAT_OPTION_INTEGER("data_id",      MAGIC_DATA_ID,      1),
-	FORMAT_OPTION_INTEGER("track_step",   MAGIC_TRACK_STEP,   1),
-	FORMAT_OPTION_INTEGER("bounds",       MAGIC_BOUNDS,       9),
+	FORMAT_OPTION_INTEGER_OBSOLETE("track_step",   MAGIC_TRACK_STEP,   1),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",       MAGIC_BOUNDS_OLD,   9),
+	FORMAT_OPTION_INTEGER("bounds_old",   MAGIC_BOUNDS_OLD,   9),
+	FORMAT_OPTION_INTEGER("bounds_new",   MAGIC_BOUNDS_NEW,   9),
 	FORMAT_OPTION_END
 	};
 
@@ -701,7 +824,7 @@ static struct format_option		gcr_cbm_rw_options[] =
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -722,6 +845,8 @@ struct format_desc			gcr_cbm_format_desc =
 	.get_sectors      = gcr_cbm_get_sectors,
 	.get_sector_size  = gcr_cbm_get_sector_size,
 	.get_flags        = gcr_cbm_get_flags,
+	.get_data_offset  = gcr_cbm_get_data_offset,
+	.get_data_size    = gcr_cbm_get_data_size,
 	.track_statistics = gcr_cbm_statistics,
 	.track_read       = gcr_cbm_read_track,
 	.track_write      = gcr_cbm_write_track,

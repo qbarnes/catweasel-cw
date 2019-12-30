@@ -46,12 +46,15 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
-#include "../cwtool.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../format.h"
-#include "raw.h"
 #include "tbe.h"
+#include "bitstream.h"
+#include "container.h"
+#include "histogram.h"
 #include "setvalue.h"
 
 
@@ -80,16 +83,16 @@ tbe_read_sync(
 
 	for (i = 0; i < size; i++)
 		{
-		token = raw_read_counter(ffo_l0, lookup);
+		token = bitstream_read_counter(ffo_l0, lookup);
 		if (token == -1) return (-1);
 		if (token == 4)
 			{
-			if (i == 0) verbose(2, "got first sync at offset %d", fifo_get_rd_ofs(ffo_l0) - 1);
+			if (i == 0) verbose_message(GENERIC, 2, "got first sync at offset %d", fifo_get_rd_ofs(ffo_l0) - 1);
 			continue;
 			}
 		i = -1;
 		}
-	verbose(2, "got sync at offset %d with %d counter values", fifo_get_rd_ofs(ffo_l0) - i, i);
+	verbose_message(GENERIC, 2, "got sync at offset %d with %d counter values", fifo_get_rd_ofs(ffo_l0) - i, i);
 	return (1);
 	}
 
@@ -101,12 +104,12 @@ tbe_read_sync(
 static int
 tbe_write_sync(
 	struct fifo			*ffo_l0,
-	struct raw_counter		*raw_cnt,
+	struct bitstream_counter	*bst_cnt,
 	int				size)
 
 	{
-	verbose(2, "writing sync at offset %d with %d counter values", fifo_get_wr_ofs(ffo_l0), size);
-	while (size-- > 0) if (raw_write_counter(ffo_l0, raw_cnt, 4) == -1) return (-1);
+	verbose_message(GENERIC, 2, "writing sync at offset %d with %d counter values", fifo_get_wr_ofs(ffo_l0), size);
+	while (size-- > 0) if (bitstream_write_counter(ffo_l0, bst_cnt, 4) == -1) return (-1);
 	return (0);
 	}
 
@@ -118,12 +121,12 @@ tbe_write_sync(
 static int
 tbe_write_fill(
 	struct fifo			*ffo_l0,
-	struct raw_counter		*raw_cnt,
+	struct bitstream_counter	*bst_cnt,
 	int				size)
 
 	{
-	verbose(2, "writing fill at offset %d", fifo_get_wr_ofs(ffo_l0));
-	while (size-- > 0) if (raw_write_counter(ffo_l0, raw_cnt, 5) == -1) return (-1);
+	verbose_message(GENERIC, 2, "writing fill at offset %d", fifo_get_wr_ofs(ffo_l0));
+	while (size-- > 0) if (bitstream_write_counter(ffo_l0, bst_cnt, 5) == -1) return (-1);
 	return (0);
 	}
 
@@ -144,11 +147,11 @@ tbe_read_2bits(
 	int				token;
 
 	if (val == -1) return (-1);
-	token = raw_read_counter(ffo_l0, lookup);
+	token = bitstream_read_counter(ffo_l0, lookup);
 	if (token == -1) return (-1);
 	if ((token < 0) || (token > 3))
 		{
-		verbose(3, "wrong counter value at offset %d (byte %d)", fifo_get_rd_ofs(ffo_l0) - 1, ofs);
+		verbose_message(GENERIC, 3, "wrong counter value at offset %d (byte %d)", fifo_get_rd_ofs(ffo_l0) - 1, ofs);
 		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 		token = 0;
 		}
@@ -181,7 +184,7 @@ tbe_read_bytes(
 		if (val == -1) return (-1);
 		data[i] = val;
 		}
-	verbose(2, "read %d bytes at offset %d", i, ofs);
+	verbose_message(GENERIC, 2, "read %d bytes at offset %d", i, ofs);
 	return (0);
 	}
 
@@ -192,21 +195,21 @@ tbe_read_bytes(
 static int
 tbe_write_bytes(
 	struct fifo			*ffo_l0,
-	struct raw_counter		*raw_cnt,
+	struct bitstream_counter	*bst_cnt,
 	unsigned char			*data,
 	int				size)
 
 	{
 	int				i, val;
 
-	verbose(2, "writing %d bytes at offset %d", size, fifo_get_wr_ofs(ffo_l0));
+	verbose_message(GENERIC, 2, "writing %d bytes at offset %d", size, fifo_get_wr_ofs(ffo_l0));
 	for (i = 0; i < size; i++)
 		{
 		val = data[i];
-		if (raw_write_counter(ffo_l0, raw_cnt, val >> 6)       == -1) return (-1);
-		if (raw_write_counter(ffo_l0, raw_cnt, (val >> 4) & 3) == -1) return (-1);
-		if (raw_write_counter(ffo_l0, raw_cnt, (val >> 2) & 3) == -1) return (-1);
-		if (raw_write_counter(ffo_l0, raw_cnt, val & 3)        == -1) return (-1);
+		if (bitstream_write_counter(ffo_l0, bst_cnt, val >> 6)       == -1) return (-1);
+		if (bitstream_write_counter(ffo_l0, bst_cnt, (val >> 4) & 3) == -1) return (-1);
+		if (bitstream_write_counter(ffo_l0, bst_cnt, (val >> 2) & 3) == -1) return (-1);
+		if (bitstream_write_counter(ffo_l0, bst_cnt, val & 3)        == -1) return (-1);
 		}
 	return (0);
 	}
@@ -331,7 +334,7 @@ tbe_cw_calculate_bitswap(
 		count[(val >> 2) & 3]++;
 		count[val & 3]++;
 		}
-	debug(3, "count[4] = {%6d,%6d,%6d,%6d }", count[0], count[1], count[2], count[3]);
+	debug_message(GENERIC, 3, "count[4] = {%6d,%6d,%6d,%6d }", count[0], count[1], count[2], count[3]);
 
 	/* swap bit pairs, so that the most occuring pair is 00 */
 
@@ -341,7 +344,7 @@ tbe_cw_calculate_bitswap(
 	if (count[1] < count[3]) tbe_cw_swap(count, swap1, 1, 3);
 	if (count[1] < count[2]) tbe_cw_swap(count, swap1, 1, 2);
 	i = tbe_cw_bitswap(data, size, swap1[0], swap1[1], swap1[2], swap1[3]);
-	debug(3, "swap1[4] = { %d, %d, %d, %d }", swap1[0], swap1[1], swap1[2], swap1[3]);
+	debug_message(GENERIC, 3, "swap1[4] = { %d, %d, %d, %d }", swap1[0], swap1[1], swap1[2], swap1[3]);
 	debug_error_condition(i == -1);
 
 	/* return information how to swap back */
@@ -372,7 +375,7 @@ tbe_cw_read_sector2(
 	if (tbe_read_bytes(ffo_l0, dsk_err, lookup, data, HEADER_SIZE) == -1) return (-1);
 	size = tbe_cw_sector_size(tbe_cw, data[5]);
 	if (tbe_read_bytes(ffo_l0, dsk_err, lookup, &data[HEADER_SIZE], size) == -1) return (-1);
-	verbose(2, "rewinding to offset %d", ofs);
+	verbose_message(GENERIC, 2, "rewinding to offset %d", ofs);
 	fifo_set_rd_ofs(ffo_l0, ofs);
 	return (1);
 	}
@@ -386,14 +389,14 @@ static int
 tbe_cw_write_sector2(
 	struct fifo			*ffo_l0,
 	struct tbe_cw			*tbe_cw,
-	struct raw_counter		*raw_cnt,
+	struct bitstream_counter	*bst_cnt,
 	unsigned char			*data,
 	int				size)
 
 	{
-	if (tbe_write_fill(ffo_l0, raw_cnt, 1) == -1) return (-1);
-	if (tbe_write_sync(ffo_l0, raw_cnt, tbe_cw->rd.sync_length) == -1) return (-1);
-	if (tbe_write_bytes(ffo_l0, raw_cnt, data, size) == -1) return (-1);
+	if (tbe_write_fill(ffo_l0, bst_cnt, 1) == -1) return (-1);
+	if (tbe_write_sync(ffo_l0, bst_cnt, tbe_cw->rd.sync_length) == -1) return (-1);
+	if (tbe_write_bytes(ffo_l0, bst_cnt, data, size) == -1) return (-1);
 	return (1);
 	}
 
@@ -422,31 +425,31 @@ tbe_cw_read_sector(
 	sector = data[5];
 	if (sector >= tbe_cw->rw.sectors)
 		{
-		verbose(1, "sector %d out of range", sector);
+		verbose_message(GENERIC, 1, "sector %d out of range", sector);
 		return (0);
 		}
-	verbose(1, "got sector %d", sector);
+	verbose_message(GENERIC, 1, "got sector %d", sector);
 
 	/* check sector quality */
 
 	size = tbe_cw_sector_size(tbe_cw, sector);
-	result = format_compare2("sector size: got %d, expected %d", tbe_read_ushort_be(&data[6]), size);
-	if (result > 0) verbose(2, "wrong sector size on sector %d", sector);
+	result = format_compare2("sector size: got %d, expected %d", tbe_read_u16_be(&data[6]), size);
+	if (result > 0) verbose_message(GENERIC, 2, "wrong sector size on sector %d", sector);
 	if (tbe_cw->rd.flags & FLAG_IGNORE_SECTOR_SIZE) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_SIZE, result);
 
-	result = format_compare2("crc16 checksum: got 0x%04x, expected 0x%04x", tbe_read_ushort_be(data), tbe_crc16(tbe_cw->rw.crc16_init_value, &data[2], HEADER_SIZE - 2 + size));
-	if (result > 0) verbose(2, "checksum error on sector %d", sector);
+	result = format_compare2("crc16 checksum: got 0x%04x, expected 0x%04x", tbe_read_u16_be(data), tbe_crc16(tbe_cw->rw.crc16_init_value, &data[2], HEADER_SIZE - 2 + size));
+	if (result > 0) verbose_message(GENERIC, 2, "checksum error on sector %d", sector);
 	if (tbe_cw->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", data[4], track);
-	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "track mismatch on sector %d", sector);
 	if (tbe_cw->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("format_id: got %d, expected %d", data[2], tbe_cw->rw.format_id);
-	if (result > 0) verbose(2, "wrong format_id on sector %d", sector);
+	if (result > 0) verbose_message(GENERIC, 2, "wrong format_id on sector %d", sector);
 	if (tbe_cw->rd.flags & FLAG_IGNORE_FORMAT_ID) disk_warning_add(&dsk_err, result);
 	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
@@ -455,7 +458,7 @@ tbe_cw_read_sector(
 	if (tbe_cw_bitswap(&data[HEADER_SIZE], size, data[3] >> 6,
 		(data[3] >> 4) & 3, (data[3] >> 2) & 3, data[3] & 3) == -1)
 		{
-		verbose(2, "invalid bit pair swap vector on sector %d", sector);
+		verbose_message(GENERIC, 2, "invalid bit pair swap vector on sector %d", sector);
 		disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, 1);
 		}
 
@@ -479,7 +482,7 @@ tbe_cw_write_sector(
 	struct fifo			*ffo_l0,
 	struct tbe_cw			*tbe_cw,
 	struct disk_sector		*dsk_sct,
-	struct raw_counter		*raw_cnt,
+	struct bitstream_counter	*bst_cnt,
 	int				track)
 
 	{
@@ -487,15 +490,15 @@ tbe_cw_write_sector(
 	int				sector = disk_get_sector_number(dsk_sct);
 	int				size = tbe_cw_sector_size(tbe_cw, sector);
 
-	verbose(1, "writing sector %d", sector);
+	verbose_message(GENERIC, 1, "writing sector %d", sector);
 	disk_sector_write(&data[HEADER_SIZE], dsk_sct);
 	data[2] = tbe_cw->rw.format_id;
 	data[3] = tbe_cw_calculate_bitswap(&data[HEADER_SIZE], size);
 	data[4] = track;
 	data[5] = sector;
-	tbe_write_ushort_be(&data[6], size);
-	tbe_write_ushort_be(data, tbe_crc16(tbe_cw->rw.crc16_init_value, &data[2], HEADER_SIZE - 2 + size));
-	return (tbe_cw_write_sector2(ffo_l0, tbe_cw, raw_cnt, data, HEADER_SIZE + size));
+	tbe_write_u16_be(&data[6], size);
+	tbe_write_u16_be(data, tbe_crc16(tbe_cw->rw.crc16_init_value, &data[2], HEADER_SIZE - 2 + size));
+	return (tbe_cw_write_sector2(ffo_l0, tbe_cw, bst_cnt, data, HEADER_SIZE + size));
 	}
 
 
@@ -507,11 +510,12 @@ static int
 tbe_cw_statistics(
 	union format			*fmt,
 	struct fifo			*ffo_l0,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	raw_histogram(ffo_l0, track, track);
-	raw_precomp_statistics(ffo_l0, fmt->tbe_cw.rw.bnd, 6);
+	histogram_normal(ffo_l0, cwtool_track, cwtool_track, -1);
 	return (1);
 	}
 
@@ -523,16 +527,19 @@ tbe_cw_statistics(
 static int
 tbe_cw_read_track(
 	union format			*fmt,
+	struct container		*con,
 	struct fifo			*ffo_l0,
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	int				lookup[128];
 
-	raw_read_lookup(fmt->tbe_cw.rw.bnd, 6, lookup);
-	while (tbe_cw_read_sector(ffo_l0, &fmt->tbe_cw, dsk_sct, lookup, track) != -1) ;
+	bitstream_read_lookup(fmt->tbe_cw.rw.bnd, 6, lookup);
+	while (tbe_cw_read_sector(ffo_l0, &fmt->tbe_cw, dsk_sct, lookup, cwtool_track) != -1) ;
 	return (1);
 	}
 
@@ -547,16 +554,19 @@ tbe_cw_write_track(
 	struct fifo			*ffo_l3,
 	struct disk_sector		*dsk_sct,
 	struct fifo			*ffo_l0,
-	int				track)
+	unsigned char			*data,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	struct raw_counter		raw_cnt = RAW_COUNTER_INIT(fmt->tbe_cw.rw.bnd, fmt->tbe_cw.wr.precomp, 6);
+	struct bitstream_counter	bst_cnt = BITSTREAM_COUNTER_INIT(fmt->tbe_cw.rw.bnd, fmt->tbe_cw.wr.precomp, 6);
 	int				i;
 
-	if (tbe_write_fill(ffo_l0, &raw_cnt, fmt->tbe_cw.wr.prolog_length) == -1) return (0);
-	for (i = 0; i < fmt->tbe_cw.rw.sectors; i++) if (tbe_cw_write_sector(ffo_l0, &fmt->tbe_cw, &dsk_sct[i], &raw_cnt, track) == -1) return (0);
+	if (tbe_write_fill(ffo_l0, &bst_cnt, fmt->tbe_cw.wr.prolog_length) == -1) return (0);
+	for (i = 0; i < fmt->tbe_cw.rw.sectors; i++) if (tbe_cw_write_sector(ffo_l0, &fmt->tbe_cw, &dsk_sct[i], &bst_cnt, cwtool_track) == -1) return (0);
 	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
-	if (tbe_write_fill(ffo_l0, &raw_cnt, fmt->tbe_cw.wr.epilog_length) == -1) return (0);
+	if (tbe_write_fill(ffo_l0, &bst_cnt, fmt->tbe_cw.wr.epilog_length) == -1) return (0);
 	fifo_set_flags(ffo_l0, FIFO_FLAG_WRITABLE);
 	return (1);
 	}
@@ -586,7 +596,8 @@ tbe_cw_write_track(
 #define MAGIC_CRC16_INIT_VALUE		11
 #define MAGIC_SECTOR0_SIZE		12
 #define MAGIC_SECTOR_SIZE		13
-#define MAGIC_BOUNDS			14
+#define MAGIC_BOUNDS_OLD		14
+#define MAGIC_BOUNDS_NEW		15
 
 
 
@@ -620,17 +631,17 @@ tbe_cw_set_defaults(
 			.sector_size      = 1024,
 			.bnd              =
 				{
-				BOUNDS(0x0800, 0x1900, 0x1e00, 0),
-				BOUNDS(0x1f00, 0x2500, 0x2a00, 1),
-				BOUNDS(0x2b00, 0x3100, 0x3600, 2),
-				BOUNDS(0x3700, 0x3d00, 0x4600, 3),
-				BOUNDS(0x4700, 0x5000, 0x6300, 4),
-				BOUNDS(0x6400, 0x7800, 0x7f00, 5)
+				BOUNDS_NEW(0x0800, 0x1800, 0x1e00, 0),
+				BOUNDS_NEW(0x1f00, 0x2400, 0x2a00, 1),
+				BOUNDS_NEW(0x2b00, 0x3000, 0x3600, 2),
+				BOUNDS_NEW(0x3700, 0x3c00, 0x4600, 3),
+				BOUNDS_NEW(0x4700, 0x4f00, 0x6300, 4),
+				BOUNDS_NEW(0x6400, 0x7700, 0x7f00, 5)
 				}
 			}
 		};
 
-	debug(2, "setting defaults");
+	debug_message(GENERIC, 2, "setting defaults");
 	fmt->tbe_cw = tbe_cw;
 	}
 
@@ -647,7 +658,7 @@ tbe_cw_set_read_option(
 	int				ofs)
 
 	{
-	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_SYNC_LENGTH)           return (setvalue_uchar(&fmt->tbe_cw.rd.sync_length, val, 1, 0xff));
 	if (magic == MAGIC_IGNORE_SECTOR_SIZE)    return (setvalue_uchar_bit(&fmt->tbe_cw.rd.flags, val, FLAG_IGNORE_SECTOR_SIZE));
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->tbe_cw.rd.flags, val, FLAG_IGNORE_CHECKSUMS));
@@ -669,7 +680,7 @@ tbe_cw_set_write_option(
 	int				ofs)
 
 	{
-	debug(2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_PROLOG_LENGTH) return (setvalue_ushort(&fmt->tbe_cw.wr.prolog_length, val, 4, 0xffff));
 	if (magic == MAGIC_EPILOG_LENGTH) return (setvalue_ushort(&fmt->tbe_cw.wr.epilog_length, val, 4, 0xffff));
 	debug_error_condition(magic != MAGIC_PRECOMP);
@@ -689,14 +700,15 @@ tbe_cw_set_rw_option(
 	int				ofs)
 
 	{
-	debug(2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
-	if (magic == MAGIC_SECTORS)          return (setvalue_uchar(&fmt->tbe_cw.rw.sectors, val, 1, CWTOOL_MAX_SECTOR));
+	debug_message(GENERIC, 2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	if (magic == MAGIC_SECTORS)          return (setvalue_uchar(&fmt->tbe_cw.rw.sectors, val, 1, GLOBAL_NR_SECTORS));
 	if (magic == MAGIC_FORMAT_ID)        return (setvalue_uchar(&fmt->tbe_cw.rw.format_id, val, 0, 0xff));
 	if (magic == MAGIC_CRC16_INIT_VALUE) return (setvalue_ushort(&fmt->tbe_cw.rw.crc16_init_value, val, 0, 0xffff));
 	if (magic == MAGIC_SECTOR0_SIZE)     return (setvalue_ushort(&fmt->tbe_cw.rw.sector0_size, val, 0x10, 0x4000));
 	if (magic == MAGIC_SECTOR_SIZE)      return (setvalue_ushort(&fmt->tbe_cw.rw.sector_size, val, 0x10, 0x4000));
-	debug_error_condition(magic != MAGIC_BOUNDS);
-	return (setvalue_bounds(fmt->tbe_cw.rw.bnd, val, ofs));
+	if (magic == MAGIC_BOUNDS_OLD)       return (setvalue_bounds_old(fmt->tbe_cw.rw.bnd, val, ofs));
+	debug_error_condition(magic != MAGIC_BOUNDS_NEW);
+	return (setvalue_bounds_new(fmt->tbe_cw.rw.bnd, val, ofs));
 	}
 
 
@@ -747,6 +759,32 @@ tbe_cw_get_flags(
 
 
 /****************************************************************************
+ * tbe_cw_get_data_offset
+ ****************************************************************************/
+static int
+tbe_cw_get_data_offset(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
+ * tbe_cw_get_data_size
+ ****************************************************************************/
+static int
+tbe_cw_get_data_size(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
  * tbe_cw_read_options
  ****************************************************************************/
 static struct format_option		tbe_cw_read_options[] =
@@ -784,7 +822,9 @@ static struct format_option		tbe_cw_rw_options[] =
 	FORMAT_OPTION_INTEGER("crc16_init_value", MAGIC_CRC16_INIT_VALUE,  1),
 	FORMAT_OPTION_INTEGER("sector0_size",     MAGIC_SECTOR0_SIZE,      1),
 	FORMAT_OPTION_INTEGER("sector_size",      MAGIC_SECTOR_SIZE,       1),
-	FORMAT_OPTION_INTEGER("bounds",           MAGIC_BOUNDS,           18),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",           MAGIC_BOUNDS_OLD,       18),
+	FORMAT_OPTION_INTEGER("bounds_old",       MAGIC_BOUNDS_OLD,       18),
+	FORMAT_OPTION_INTEGER("bounds_new",       MAGIC_BOUNDS_NEW,       18),
 	FORMAT_OPTION_END
 	};
 
@@ -793,7 +833,7 @@ static struct format_option		tbe_cw_rw_options[] =
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -814,6 +854,8 @@ struct format_desc			tbe_cw_format_desc =
 	.get_sectors      = tbe_cw_get_sectors,
 	.get_sector_size  = tbe_cw_get_sector_size,
 	.get_flags        = tbe_cw_get_flags,
+	.get_data_offset  = tbe_cw_get_data_offset,
+	.get_data_size    = tbe_cw_get_data_size,
 	.track_statistics = tbe_cw_statistics,
 	.track_read       = tbe_cw_read_track,
 	.track_write      = tbe_cw_write_track,

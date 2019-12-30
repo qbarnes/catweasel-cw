@@ -10,11 +10,13 @@
 
 
 
-#ifndef CWTOOL_MFM_NEC765_H
-#define CWTOOL_MFM_NEC765_H
+#ifndef CWTOOL_FORMAT_MFM_NEC765_H
+#define CWTOOL_FORMAT_MFM_NEC765_H
 
-#include "../cwtool.h"
+#include "types.h"
+#include "../global.h"
 #include "bounds.h"
+#include "desc.h"
 
 struct mfm_nec765
 	{
@@ -58,22 +60,14 @@ struct mfm_nec765
 		unsigned char		data_address_mark1;
 		unsigned char		data_address_mark2;
 		unsigned char		track_step;
-		unsigned char		pshift[(CWTOOL_MAX_SECTOR + 1) / 2];
+		unsigned char		pshift[(GLOBAL_NR_SECTORS + 1) / 2];
 		struct bounds		bnd[3];
 		}			rw;
 	};
-
-/*
- * do not put this include at the beginning of the file, because ../format.h
- * also includes this file to construct union format. so the above struct
- * has to be known at time of inclusion
- */
-
-#include "../format.h"
 
 extern struct format_desc		mfm_nec765_format_desc;
 
 
 
-#endif /* !CWTOOL_MFM_NEC765_H */
+#endif /* !CWTOOL_FORMAT_MFM_NEC765_H */
 /******************************************************** Karsten Scheibler */

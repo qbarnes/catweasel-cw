@@ -13,9 +13,31 @@
 #ifndef CWTOOL_IMPORT_H
 #define CWTOOL_IMPORT_H
 
-extern int				import_ushort_be(unsigned char *);
-extern int				import_ushort_le(unsigned char *);
-extern unsigned long			import_ulong_le(unsigned char *);
+#include "types.h"
+
+
+
+
+/****************************************************************************
+ *
+ * global functions
+ *
+ ****************************************************************************/
+
+
+
+
+extern cw_u16_t
+import_u16_be(
+	cw_u8_t				*data);
+
+extern cw_u16_t
+import_u16_le(
+	cw_u8_t				*data);
+
+extern cw_u32_t
+import_u32_le(
+	cw_u8_t				*data);
 
 
 

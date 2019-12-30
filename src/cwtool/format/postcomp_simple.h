@@ -1,7 +1,7 @@
 /****************************************************************************
  ****************************************************************************
  *
- * cwfloppy.h
+ * format/postcomp_simple.h
  *
  ****************************************************************************
  ****************************************************************************/
@@ -10,18 +10,18 @@
 
 
 
-#ifndef CWFLOPPY_H
-#define CWFLOPPY_H
+#ifndef CWTOOL_FORMAT_POSTCOMP_SIMPLE_H
+#define CWTOOL_FORMAT_POSTCOMP_SIMPLE_H
 
-#include <linux/fs.h>
+#include "types.h"
 
-struct cw_floppies;
+struct fifo;
+struct bounds;
 
-extern struct file_operations		cwfloppy_fops;
-extern int				cwfloppy_init(struct cw_floppies *);
-extern void				cwfloppy_exit(struct cw_floppies *);
+extern int				postcomp_simple(struct fifo *, struct bounds *, int);
+extern int				postcomp_simple_adjust(struct fifo *, struct bounds *, int, int, int);
 
 
 
-#endif /* !CWFLOPPY_H */
+#endif /* !CWTOOL_FORMAT_POSTCOMP_SIMPLE_H */
 /******************************************************** Karsten Scheibler */

@@ -13,13 +13,14 @@
 #ifndef CWTOOL_DRIVE_H
 #define CWTOOL_DRIVE_H
 
-#include "cwtool.h"
+#include "types.h"
+#include "global.h"
 
 struct drive
 	{
-	char				path[CWTOOL_MAX_PATH_LEN];
-	char				info[CWTOOL_MAX_NAME_LEN];
-	int				version;
+	char				path[GLOBAL_MAX_PATH_SIZE];
+	char				info[GLOBAL_MAX_NAME_SIZE];
+	int				revision;
 	struct cw_floppyinfo		fli;
 	};
 
@@ -31,6 +32,7 @@ extern int				drive_set_path(struct drive *, const char *);
 extern int				drive_set_info(struct drive *, const char *);
 extern int				drive_set_settle_time(struct drive *, int);
 extern int				drive_set_step_time(struct drive *, int);
+extern int				drive_set_wpulse_length(struct drive *, int);
 extern int				drive_set_flag(struct drive *, int, int);
 extern const char			*drive_get_path(struct drive *);
 extern const char			*drive_get_info(struct drive *);

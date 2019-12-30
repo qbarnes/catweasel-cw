@@ -16,6 +16,8 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../file.h"
@@ -23,8 +25,9 @@
 
 
 
-#define FLAG_IGNORE_SIZE		(1 << 0)
-#define FLAG_END_SEEN			(1 << 1)
+#define FLAG_NOERROR			(1 << 0)
+#define FLAG_IGNORE_SIZE		(1 << 1)
+#define FLAG_END_SEEN			(1 << 2)
 
 
 
@@ -47,6 +50,25 @@ image_d64_open(
 
 
 /****************************************************************************
+ * image_d64_noerror_open
+ ****************************************************************************/
+static int
+image_d64_noerror_open(
+	union image			*img,
+	char				*path,
+	int				mode,
+	int				flags)
+
+	{
+	image_open(img, &img->d64.fil, path, mode);
+	img->d64.flags = FLAG_NOERROR;
+	if (flags & IMAGE_FLAG_IGNORE_SIZE) img->d64.flags |= FLAG_IGNORE_SIZE;
+	return (1);
+	}
+
+
+
+/****************************************************************************
  * image_d64_close
  ****************************************************************************/
 static int
@@ -60,7 +82,7 @@ image_d64_close(
 	if (file_is_readable(&img->d64.fil))
 		{
 
-		/* check if we already reached the end of file */
+		/* check if end of file is already reached */
 
 		if (img->d64.flags & (FLAG_IGNORE_SIZE | FLAG_END_SEEN)) goto done;
 
@@ -69,18 +91,22 @@ image_d64_close(
 		 * get exactly one byte per sector for error information
 		 */
 
-		for (t = s = 0; t < CWTOOL_MAX_TRACK; t++) s += img->d64.sectors[t];
+		for (t = s = 0; t < GLOBAL_NR_TRACKS; t++) s += img->d64.sectors[t];
 		buffer = (unsigned char *) alloca(s + 1);
 		if (buffer == NULL) error_oom();
 		size = file_read(&img->d64.fil, buffer, s + 1);
-		if (size == s) verbose(1, "ignoring %d bytes of error information from '%s'", size, file_get_path(&img->d64.fil));
+		if (size == s) verbose_message(GENERIC, 1, "ignoring %d bytes of error information from '%s'", size, file_get_path(&img->d64.fil));
 		if ((size == 0) || (size == s)) goto done;
 		error_warning("file '%s' is larger than needed", file_get_path(&img->d64.fil));
 		}
 
+	/* done if no error information should be written */
+
+	if (img->d64.flags & FLAG_NOERROR) goto done;
+
 	/* count errors in image */
 
-	for (e = t = s = 0; t < CWTOOL_MAX_TRACK; t++)
+	for (e = t = s = 0; t < GLOBAL_NR_TRACKS; t++)
 		{
 		size = img->d64.sectors[t];
 		if (size == 0) continue;
@@ -89,11 +115,11 @@ image_d64_close(
 
 	/* append error information, if errors were found */
 
-	if (e > 0) for (t = 0; t < CWTOOL_MAX_TRACK; t++)
+	if (e > 0) for (t = 0; t < GLOBAL_NR_TRACKS; t++)
 		{
 		size = img->d64.sectors[t];
 		if (size == 0) continue;
-		verbose(1, "appending error information for track %d with %d bytes to '%s'", t, size, file_get_path(&img->d64.fil));
+		verbose_message(GENERIC, 1, "appending error information for track %d with %d bytes to '%s'", t, size, file_get_path(&img->d64.fil));
 		file_write(&img->d64.fil, img->d64.errors[t], size);
 		}
 done:
@@ -133,7 +159,7 @@ image_d64_read(
 	debug_error_condition(! file_is_readable(&img->d64.fil));
 	fifo_set_wr_ofs(ffo, size);
 	if (img->d64.flags & FLAG_END_SEEN) goto done;
-	verbose(1, "reading plain track %d with %d bytes from '%s'", track, size, file_get_path(&img->d64.fil));
+	verbose_message(GENERIC, 1, "reading D64 track %d with %d bytes from '%s'", track, size, file_get_path(&img->d64.fil));
 	size = file_read(&img->d64.fil, fifo_get_data(ffo), size);
 	img->d64.offset += size;
 	img->d64.sectors[track] = sectors;
@@ -163,9 +189,9 @@ image_d64_write(
 	int				s;
 
 	debug_error_condition(! file_is_writable(&img->d64.fil));
-	debug_error_condition((track < 0) || (track >= CWTOOL_MAX_TRACK));
-	debug_error_condition((sectors <= 0) || (sectors > CWTOOL_MAX_SECTOR));
-	verbose(1, "writing plain track %d with %d bytes to '%s'", track, size, file_get_path(&img->d64.fil));
+	debug_error_condition((track < 0) || (track >= GLOBAL_NR_TRACKS));
+	debug_error_condition((sectors <= 0) || (sectors > GLOBAL_NR_SECTORS));
+	verbose_message(GENERIC, 1, "writing D64 track %d with %d bytes to '%s'", track, size, file_get_path(&img->d64.fil));
 	file_write(&img->d64.fil, fifo_get_data(ffo), size);
 	fifo_set_rd_ofs(ffo, size);
 	img->d64.offset += size;
@@ -201,7 +227,7 @@ image_d64_done(
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -215,7 +241,26 @@ struct image_desc			image_d64_desc =
 	{
 	.name        = "d64",
 	.level       = 3,
+	.flags       = IMAGE_FLAG_CONTINUOUS_TRACK,
 	.open        = image_d64_open,
+	.close       = image_d64_close,
+	.offset      = image_d64_offset,
+	.track_read  = image_d64_read,
+	.track_write = image_d64_write,
+	.track_done  = image_d64_done
+	};
+
+
+
+/****************************************************************************
+ * image_d64_noerror_desc
+ ****************************************************************************/
+struct image_desc			image_d64_noerror_desc =
+	{
+	.name        = "d64_noerror",
+	.level       = 3,
+	.flags       = IMAGE_FLAG_CONTINUOUS_TRACK,
+	.open        = image_d64_noerror_open,
 	.close       = image_d64_close,
 	.offset      = image_d64_offset,
 	.track_read  = image_d64_read,

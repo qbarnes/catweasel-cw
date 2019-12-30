@@ -16,11 +16,24 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
+#include "../global.h"
+#include "../options.h"
 #include "../config.h"
 #include "../disk.h"
 #include "../format.h"
+#include "../trackmap.h"
 #include "../image.h"
 #include "../string.h"
+
+
+
+
+/****************************************************************************
+ *
+ * data structures and defines
+ *
+ ****************************************************************************/
+
 
 
 
@@ -44,7 +57,23 @@ struct disk_params
 
 
 
-static int				config_disk_directive(struct config *, struct disk *, struct disk_track *, struct disk_params *, int);
+
+/****************************************************************************
+ *
+ * forward declarations
+ *
+ ****************************************************************************/
+
+
+
+
+static cw_bool_t
+config_disk_directive(
+	struct config			*cfg,
+	struct disk			*dsk,
+	struct disk_track		*dsk_trk,
+	struct disk_params		*dsk_prm,
+	cw_flag_t			scope);
 
 
 
@@ -61,7 +90,7 @@ static int				config_disk_directive(struct config *, struct disk *, struct disk_
 /****************************************************************************
  * config_disk_error_timeout
  ****************************************************************************/
-static void
+static cw_void_t
 config_disk_error_timeout(
 	struct config			*cfg)
 
@@ -74,7 +103,7 @@ config_disk_error_timeout(
 /****************************************************************************
  * config_disk_error_format
  ****************************************************************************/
-static void
+static cw_void_t
 config_disk_error_format(
 	struct config			*cfg)
 
@@ -87,12 +116,12 @@ config_disk_error_format(
 /****************************************************************************
  * config_disk_trackvalue
  ****************************************************************************/
-static int
+static cw_count_t
 config_disk_trackvalue(
 	struct config			*cfg)
 
 	{
-	int				track = config_number(cfg, NULL, 0);
+	cw_count_t			track = config_number(cfg, NULL, 0);
 
 	if (! disk_check_track(track)) config_error(cfg, "invalid track value");
 	return (track);
@@ -101,51 +130,21 @@ config_disk_trackvalue(
 
 
 /****************************************************************************
- * config_disk_name
- ****************************************************************************/
-static char *
-config_disk_name(
-	struct config			*cfg,
-	char				*error,
-	char				*token,
-	int				len)
-
-	{
-	static const char		valid[] = "_.-+";
-	int				c, i, j;
-
-	if (! config_string(cfg, token, len)) config_error(cfg, error);
-	for (i = 0; token[i] != '\0'; i++)
-		{
-		c = token[i];
-		if ((c >= 'a') && (c <= 'z')) continue;
-		if ((c >= 'A') && (c <= 'Z')) continue;
-		for (j = 0; valid[j] != '\0'; j++) if (c == valid[j]) break;
-		if (valid[j] != '\0') continue;
-		if ((i > 0) && (c >= '0') && (c <= '9')) continue;
-		config_error(cfg, "invalid character in name");
-		}
-	return (token);
-	}
-
-
-
-/****************************************************************************
  * config_disk_enter
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_enter(
 	struct config			*cfg,
 	struct disk			*dsk,
 	struct disk_track		*dsk_trk,
 	struct disk_params		*dsk_prm,
-	int				scope)
+	cw_flag_t			scope)
 
 	{
 	scope &= ~SCOPE_ENTER;
 	scope |= SCOPE_LEAVE;
 	while (config_disk_directive(cfg, dsk, dsk_trk, dsk_prm, scope)) ;
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -153,17 +152,17 @@ config_disk_enter(
 /****************************************************************************
  * config_disk_info
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_info(
 	struct config			*cfg,
 	struct disk			*dsk)
 
 	{
-	char				info[CWTOOL_MAX_NAME_LEN];
+	cw_char_t			info[GLOBAL_MAX_NAME_SIZE];
 
 	config_string(cfg, info, sizeof (info));
 	if (! disk_set_info(dsk, info)) debug_error();
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -171,18 +170,19 @@ config_disk_info(
 /****************************************************************************
  * config_disk_copy
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_copy(
 	struct config			*cfg,
 	struct disk			*dsk)
 
 	{
-	char				token[CWTOOL_MAX_NAME_LEN];
+	cw_char_t			token[GLOBAL_MAX_NAME_SIZE];
 	struct disk			*dsk2;
 
-	dsk2 = disk_search(config_disk_name(cfg, "disk name expected", token, sizeof (token)));
+	dsk2 = disk_search(config_name(cfg, "disk name expected", token, sizeof (token)));
 	if (dsk2 == NULL) config_error(cfg, "unknown disk name '%s'", token);
-	return (disk_copy(dsk, dsk2));
+	if (! disk_copy(dsk, dsk2)) debug_error();
+	return (CW_BOOL_OK);
 	}
 
 
@@ -190,18 +190,39 @@ config_disk_copy(
 /****************************************************************************
  * config_disk_image
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_image(
 	struct config			*cfg,
 	struct disk			*dsk)
 
 	{
-	char				token[CWTOOL_MAX_NAME_LEN];
+	cw_char_t			token[GLOBAL_MAX_NAME_SIZE];
 	struct image_desc		*img_dsc;
 
-	img_dsc = image_search_desc(config_disk_name(cfg, "image name expected", token, sizeof (token)));
+	img_dsc = image_search_desc(config_name(cfg, "image name expected", token, sizeof (token)));
 	if (img_dsc == NULL) config_error(cfg, "unknown image name '%s'", token);
-	return (disk_set_image(dsk, img_dsc));
+	if (! disk_set_image(dsk, img_dsc)) debug_error();
+	return (CW_BOOL_OK);
+	}
+
+
+
+/****************************************************************************
+ * config_disk_trackmap
+ ****************************************************************************/
+static cw_bool_t
+config_disk_trackmap(
+	struct config			*cfg,
+	struct disk			*dsk)
+
+	{
+	cw_char_t			token[GLOBAL_MAX_NAME_SIZE];
+	struct trackmap			*trm;
+
+	trm = trackmap_search(config_name(cfg, "trackmap name expected", token, sizeof (token)));
+	if (trm == NULL) config_error(cfg, "unknown trackmap name '%s'", token);
+	if (! disk_set_trackmap(dsk, trm)) debug_error();
+	return (CW_BOOL_OK);
 	}
 
 
@@ -209,7 +230,7 @@ config_disk_image(
 /****************************************************************************
  * config_disk_track
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_track(
 	struct config			*cfg,
 	struct disk			*dsk,
@@ -217,13 +238,13 @@ config_disk_track(
 
 	{
 	struct disk_track		dsk_trk2;
-	int				track;
+	cw_count_t			cwtool_track;
 
-	dsk_trk2 = *dsk_trk;
-	track    = config_disk_trackvalue(cfg);
+	dsk_trk2     = *dsk_trk;
+	cwtool_track = config_disk_trackvalue(cfg);
 	config_disk_directive(cfg, NULL, &dsk_trk2, NULL, SCOPE_ENTER | SCOPE_RW);
-	if (! disk_set_track(dsk, &dsk_trk2, track)) debug_error();
-	return (1);
+	if (! disk_set_track(dsk, &dsk_trk2, cwtool_track)) debug_error();
+	return (CW_BOOL_OK);
 	}
 
 
@@ -231,7 +252,7 @@ config_disk_track(
 /****************************************************************************
  * config_disk_track_range
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_track_range(
 	struct config			*cfg,
 	struct disk			*dsk,
@@ -239,16 +260,16 @@ config_disk_track_range(
 
 	{
 	struct disk_track		dsk_trk2;
-	int				track, end, step;
+	cw_count_t			cwtool_track, end, step;
 
-	dsk_trk2 = *dsk_trk;
-	track    = config_disk_trackvalue(cfg);
-	end      = config_disk_trackvalue(cfg);
-	step     = config_disk_trackvalue(cfg);
+	dsk_trk2     = *dsk_trk;
+	cwtool_track = config_disk_trackvalue(cfg);
+	end          = config_disk_trackvalue(cfg);
+	step         = config_disk_trackvalue(cfg);
 	if (step < 1) config_error(cfg, "invalid step size");
 	config_disk_directive(cfg, NULL, &dsk_trk2, NULL, SCOPE_ENTER | SCOPE_RW);
-	for ( ; track <= end; track += step) if (! disk_set_track(dsk, &dsk_trk2, track)) debug_error();
-	return (1);
+	for ( ; cwtool_track <= end; cwtool_track += step) if (! disk_set_track(dsk, &dsk_trk2, cwtool_track)) debug_error();
+	return (CW_BOOL_OK);
 	}
 
 
@@ -256,18 +277,19 @@ config_disk_track_range(
 /****************************************************************************
  * config_disk_format
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_format(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
-	char				token[CWTOOL_MAX_NAME_LEN];
+	cw_char_t			token[GLOBAL_MAX_NAME_SIZE];
 	struct format_desc		*fmt_dsc;
 
-	fmt_dsc = format_search_desc(config_disk_name(cfg, "format name expected", token, sizeof (token)));
+	fmt_dsc = format_search_desc(config_name(cfg, "format name expected", token, sizeof (token)));
 	if (fmt_dsc == NULL) config_error(cfg, "unknown format '%s'", token);
-	return (disk_set_format(dsk_trk, fmt_dsc));
+	if (! disk_set_format(dsk_trk, fmt_dsc)) debug_error();
+	return (CW_BOOL_OK);
 	}
 
 
@@ -275,14 +297,14 @@ config_disk_format(
 /****************************************************************************
  * config_disk_clock
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_clock(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_clock(dsk_trk, config_number(cfg, NULL, 0))) config_error(cfg, "invalid clock value");
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -290,14 +312,14 @@ config_disk_clock(
 /****************************************************************************
  * config_disk_timeout_read
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_timeout_read(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_timeout_read(dsk_trk, config_number(cfg, NULL, 0))) config_disk_error_timeout(cfg);
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -305,14 +327,14 @@ config_disk_timeout_read(
 /****************************************************************************
  * config_disk_timeout_write
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_timeout_write(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_timeout_write(dsk_trk, config_number(cfg, NULL, 0))) config_disk_error_timeout(cfg);
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -320,17 +342,17 @@ config_disk_timeout_write(
 /****************************************************************************
  * config_disk_timeout
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_timeout(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
-	int				val = config_number(cfg, NULL, 0);
+	cw_count_t			val = config_number(cfg, NULL, 0);
 
 	if (! disk_set_timeout_read(dsk_trk, val)) config_disk_error_timeout(cfg);
 	if (! disk_set_timeout_write(dsk_trk, val)) config_disk_error_timeout(cfg);
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -338,14 +360,14 @@ config_disk_timeout(
 /****************************************************************************
  * config_disk_indexed_read
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_indexed_read(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_indexed_read(dsk_trk, config_boolean(cfg, NULL, 0))) debug_error();
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -353,14 +375,14 @@ config_disk_indexed_read(
 /****************************************************************************
  * config_disk_indexed_write
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_indexed_write(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_indexed_write(dsk_trk, config_boolean(cfg, NULL, 0))) debug_error();
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -368,32 +390,17 @@ config_disk_indexed_write(
 /****************************************************************************
  * config_disk_indexed
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_indexed(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
-	int				val = config_boolean(cfg, NULL, 0);
+	cw_bool_t			val = config_boolean(cfg, NULL, 0);
 
 	if (! disk_set_indexed_read(dsk_trk, val)) debug_error();
 	if (! disk_set_indexed_write(dsk_trk, val)) debug_error();
-	return (1);
-	}
-
-
-
-/****************************************************************************
- * config_disk_flip_side
- ****************************************************************************/
-static int
-config_disk_flip_side(
-	struct config			*cfg,
-	struct disk_track		*dsk_trk)
-
-	{
-	if (! disk_set_flip_side(dsk_trk, config_boolean(cfg, NULL, 0))) debug_error();
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -401,14 +408,30 @@ config_disk_flip_side(
 /****************************************************************************
  * config_disk_optional
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_optional(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_optional(dsk_trk, config_boolean(cfg, NULL, 0))) debug_error();
-	return (1);
+	return (CW_BOOL_OK);
+	}
+
+
+
+/****************************************************************************
+ * config_disk_flip_side
+ ****************************************************************************/
+static cw_bool_t
+config_disk_flip_side(
+	struct config			*cfg,
+	struct disk_track		*dsk_trk)
+
+	{
+	if (! disk_set_flip_side(dsk_trk, config_boolean(cfg, NULL, 0))) debug_error();
+	config_warning_obsolete(cfg, "flip_side");
+	return (CW_BOOL_OK);
 	}
 
 
@@ -416,14 +439,15 @@ config_disk_optional(
 /****************************************************************************
  * config_disk_side_offset
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_side_offset(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_side_offset(dsk_trk, config_number(cfg, NULL, 0))) debug_error();
-	return (1);
+	config_warning_obsolete(cfg, "side_offset");
+	return (CW_BOOL_OK);
 	}
 
 
@@ -431,14 +455,14 @@ config_disk_side_offset(
 /****************************************************************************
  * config_disk_skew
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_skew(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_skew(dsk_trk, config_number(cfg, NULL, 0))) config_error(cfg, "invalid skew value");
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -446,14 +470,14 @@ config_disk_skew(
 /****************************************************************************
  * config_disk_interleave
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_interleave(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk)
 
 	{
 	if (! disk_set_interleave(dsk_trk, config_number(cfg, NULL, 0))) config_error(cfg, "invalid interleave value");
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -461,16 +485,19 @@ config_disk_interleave(
 /****************************************************************************
  * config_disk_params
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_params(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk,
 	struct disk_params		*dsk_prm,
-	char				*token,
-	int				len)
+	cw_char_t			*token,
+	cw_count_t			len)
 
 	{
-	int				val, rd = 1, wr = 1, rw = 1;
+	cw_count_t			val;
+	cw_bool_t			rd = CW_BOOL_TRUE;
+	cw_bool_t			wr = CW_BOOL_TRUE;
+	cw_bool_t			rw = CW_BOOL_TRUE;
 
 	if (dsk_prm->ofs >= dsk_prm->size) config_error(cfg, "too many parameters");
 	if (dsk_prm->type == FORMAT_OPTION_TYPE_BOOLEAN) val = config_boolean(cfg, token, len);
@@ -480,7 +507,7 @@ config_disk_params(
 	if (dsk_prm->fmt_opt_rw != NULL) rw = disk_set_rw_option(dsk_trk, dsk_prm->fmt_opt_rw, val, dsk_prm->ofs);
 	if ((! rd) || (! wr) || (! rw)) config_error(cfg, "invalid parameter value '%s'", token);
 	dsk_prm->ofs++;
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -488,7 +515,7 @@ config_disk_params(
 /****************************************************************************
  * config_disk_set_params
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_set_params(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk,
@@ -498,7 +525,12 @@ config_disk_set_params(
 	
 
 	{
-	struct disk_params		dsk_prm = { .fmt_opt_rd = fmt_opt_rd, .fmt_opt_wr = fmt_opt_wr, .fmt_opt_rw = fmt_opt_rw };
+	struct disk_params		dsk_prm =
+		{
+		.fmt_opt_rd = fmt_opt_rd,
+		.fmt_opt_wr = fmt_opt_wr,
+		.fmt_opt_rw = fmt_opt_rw
+		};
 
 	/*
 	 * UGLY: better use functions from format.c than directly accessing
@@ -533,7 +565,7 @@ config_disk_set_params(
 
 	config_disk_directive(cfg, NULL, dsk_trk, &dsk_prm, SCOPE_ENTER | SCOPE_PARAMS);
 	if (dsk_prm.ofs < dsk_prm.size) config_error(cfg, "too few parameters");
-	return (1);
+	return (CW_BOOL_OK);
 	}
 
 
@@ -541,17 +573,18 @@ config_disk_set_params(
 /****************************************************************************
  * config_disk_read
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_read(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk,
-	char				*name)
+	cw_char_t			*name)
 
 	{
 	struct format_option		*fmt_opt;
 
 	fmt_opt = format_search_option(disk_get_read_options(dsk_trk), name);
-	if (fmt_opt == NULL) return (0);
+	if (fmt_opt == NULL) return (CW_BOOL_FAIL);
+	if (format_option_is_obsolete(fmt_opt)) config_warning_obsolete(cfg, name);
 	return (config_disk_set_params(cfg, dsk_trk, fmt_opt, NULL, NULL));
 	}
 
@@ -560,17 +593,18 @@ config_disk_read(
 /****************************************************************************
  * config_disk_write
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_write(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk,
-	char				*name)
+	cw_char_t			*name)
 
 	{
 	struct format_option		*fmt_opt;
 
 	fmt_opt = format_search_option(disk_get_write_options(dsk_trk), name);
-	if (fmt_opt == NULL) return (0);
+	if (fmt_opt == NULL) return (CW_BOOL_FAIL);
+	if (format_option_is_obsolete(fmt_opt)) config_warning_obsolete(cfg, name);
 	return (config_disk_set_params(cfg, dsk_trk, NULL, fmt_opt, NULL));
 	}
 
@@ -579,11 +613,11 @@ config_disk_write(
 /****************************************************************************
  * config_disk_rw
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_rw(
 	struct config			*cfg,
 	struct disk_track		*dsk_trk,
-	char				*name)
+	cw_char_t			*name)
 
 	{
 	struct format_option		*fmt_opt_rd, *fmt_opt_wr, *fmt_opt_rw;
@@ -593,7 +627,8 @@ config_disk_rw(
 	fmt_opt_rw = format_search_option(disk_get_rw_options(dsk_trk), name);
 	if (fmt_opt_rw == NULL)
 		{
-		if ((fmt_opt_rd == NULL) || (fmt_opt_wr == NULL)) return (0);
+		if ((fmt_opt_rd == NULL) || (fmt_opt_wr == NULL)) return (CW_BOOL_FAIL);
+		if (format_option_is_obsolete(fmt_opt_rd) || format_option_is_obsolete(fmt_opt_wr)) config_warning_obsolete(cfg, name);
 
 		/*
 		 * UGLY: better use functions from format.c than directly
@@ -603,7 +638,11 @@ config_disk_rw(
 		debug_error_condition(fmt_opt_rd->params != fmt_opt_wr->params);
 		debug_error_condition(fmt_opt_rd->type != fmt_opt_wr->type);
 		}
-	else debug_error_condition((fmt_opt_rd != NULL) || (fmt_opt_wr != NULL));
+	else
+		{
+		if (format_option_is_obsolete(fmt_opt_rw)) config_warning_obsolete(cfg, name);
+		debug_error_condition((fmt_opt_rd != NULL) || (fmt_opt_wr != NULL));
+		}
 	return (config_disk_set_params(cfg, dsk_trk, fmt_opt_rd, fmt_opt_wr, fmt_opt_rw));
 	}
 
@@ -612,17 +651,17 @@ config_disk_rw(
 /****************************************************************************
  * config_disk_directive
  ****************************************************************************/
-static int
+static cw_bool_t
 config_disk_directive(
 	struct config			*cfg,
 	struct disk			*dsk,
 	struct disk_track		*dsk_trk,
 	struct disk_params		*dsk_prm,
-	int				scope)
+	cw_flag_t			scope)
 
 	{
-	char				token[CWTOOL_MAX_NAME_LEN];
-	int				len;
+	cw_char_t			token[GLOBAL_MAX_NAME_SIZE];
+	cw_count_t			len;
 
 	len = config_token(cfg, token, sizeof (token));
 	if (len == 0)
@@ -631,12 +670,13 @@ config_disk_directive(
 		config_error(cfg, "} expected");
 		}
 	if ((scope & SCOPE_ENTER) && (string_equal(token, "{"))) return (config_disk_enter(cfg, dsk, dsk_trk, dsk_prm, scope));
-	if ((scope & SCOPE_LEAVE) && (string_equal(token, "}"))) return (0);
+	if ((scope & SCOPE_LEAVE) && (string_equal(token, "}"))) return (CW_BOOL_FAIL);
 	if (scope & SCOPE_TRACK)
 		{
 		if (string_equal(token, "info"))        return (config_disk_info(cfg, dsk));
 		if (string_equal(token, "copy"))        return (config_disk_copy(cfg, dsk));
 		if (string_equal(token, "image"))       return (config_disk_image(cfg, dsk));
+		if (string_equal(token, "trackmap"))    return (config_disk_trackmap(cfg, dsk));
 		if (string_equal(token, "track"))       return (config_disk_track(cfg, dsk, dsk_trk));
 		if (string_equal(token, "track_range")) return (config_disk_track_range(cfg, dsk, dsk_trk));
 		}
@@ -646,36 +686,36 @@ config_disk_directive(
 		if (string_equal(token, "clock"))        return (config_disk_clock(cfg, dsk_trk));
 		if (string_equal(token, "timeout"))      return (config_disk_timeout(cfg, dsk_trk));
 		if (string_equal(token, "indexed"))      return (config_disk_indexed(cfg, dsk_trk));
-		if (string_equal(token, "flip_side"))    return (config_disk_flip_side(cfg, dsk_trk));
 		if (string_equal(token, "optional"))     return (config_disk_optional(cfg, dsk_trk));
+		if (string_equal(token, "flip_side"))    return (config_disk_flip_side(cfg, dsk_trk));
 		if (string_equal(token, "side_offset"))  return (config_disk_side_offset(cfg, dsk_trk));
 		if (string_equal(token, "read"))         return (config_disk_directive(cfg, NULL, dsk_trk, NULL, SCOPE_ENTER | SCOPE_READ));
 		if (string_equal(token, "write"))        return (config_disk_directive(cfg, NULL, dsk_trk, NULL, SCOPE_ENTER | SCOPE_WRITE));
 		if (disk_get_format(dsk_trk) == NULL)    config_disk_error_format(cfg);
 		if (string_equal(token, "skew"))         return (config_disk_skew(cfg, dsk_trk));
 		if (string_equal(token, "interleave"))   return (config_disk_interleave(cfg, dsk_trk));
-		if (config_disk_rw(cfg, dsk_trk, token)) return (1);
+		if (config_disk_rw(cfg, dsk_trk, token)) return (CW_BOOL_OK);
 		}
 	if (scope & SCOPE_READ)
 		{
 		if (string_equal(token, "timeout"))        return (config_disk_timeout_read(cfg, dsk_trk));
 		if (string_equal(token, "indexed"))        return (config_disk_indexed_read(cfg, dsk_trk));
 		if (disk_get_format(dsk_trk) == NULL)      config_disk_error_format(cfg);
-		if (config_disk_read(cfg, dsk_trk, token)) return (1);
+		if (config_disk_read(cfg, dsk_trk, token)) return (CW_BOOL_OK);
 		}
 	if (scope & SCOPE_WRITE)
 		{
 		if (string_equal(token, "timeout"))         return (config_disk_timeout_write(cfg, dsk_trk));
 		if (string_equal(token, "indexed"))         return (config_disk_indexed_write(cfg, dsk_trk));
 		if (disk_get_format(dsk_trk) == NULL)       config_disk_error_format(cfg);
-		if (config_disk_write(cfg, dsk_trk, token)) return (1);
+		if (config_disk_write(cfg, dsk_trk, token)) return (CW_BOOL_OK);
 		}
-	if ((scope & SCOPE_PARAMS) && (config_disk_params(cfg, dsk_trk, dsk_prm, token, len))) return (1);
+	if ((scope & SCOPE_PARAMS) && (config_disk_params(cfg, dsk_trk, dsk_prm, token, len))) return (CW_BOOL_OK);
 	config_error_invalid(cfg, token);
 
 	/* never reached, only to make gcc happy */
 
-	return (0);
+	return (CW_BOOL_FAIL);
 	}
 
 
@@ -683,7 +723,7 @@ config_disk_directive(
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -693,22 +733,24 @@ config_disk_directive(
 /****************************************************************************
  * config_disk
  ****************************************************************************/
-int
+cw_bool_t
 config_disk(
 	struct config			*cfg,
-	int				version)
+	cw_count_t			revision)
 
 	{
-	char				token[CWTOOL_MAX_NAME_LEN];
+	cw_char_t			token[GLOBAL_MAX_NAME_SIZE];
 	struct disk			dsk;
 
-	disk_init(&dsk, version);
-	config_disk_name(cfg, "disk name expected", token, sizeof (token));
+	disk_init(&dsk, revision);
+	config_name(cfg, "disk name expected", token, sizeof (token));
 	if (! disk_set_name(&dsk, token)) config_error(cfg, "already defined disk '%s' within this scope", token);
 	config_disk_directive(cfg, &dsk, disk_init_track_default(&dsk), NULL, SCOPE_ENTER | SCOPE_TRACK | SCOPE_RW);
-	if (! disk_tracks_used(&dsk)) config_error(cfg, "no tracks used");
-	if (! disk_image_ok(&dsk)) config_error(cfg, "specified format and image do not have the same level");
+	if (! disk_tracks_used(&dsk)) config_error(cfg, "no tracks used in disk '%s'", token);
+	if (! disk_image_ok(&dsk)) config_error(cfg, "specified format and image do not have the same level in disk '%s'", token);
+	if (! disk_trackmap_ok(&dsk)) config_error(cfg, "trackmap incomplete or illegal use of side_offset or flip_side in disk '%s'", token);
+	if (! disk_trackmap_numbering_ok(&dsk)) config_error(cfg, "image_track numbering in trackmap not compatible with selected image format in disk '%s'", token);
 	disk_insert(&dsk);
-	return (1);
+	return (CW_BOOL_OK);
 	}
 /******************************************************** Karsten Scheibler */

@@ -16,16 +16,28 @@
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
+#include "global.h"
+#include "options.h"
+
 
 
 
 /****************************************************************************
- * export_ushort_be
+ *
+ * global functions
+ *
  ****************************************************************************/
-unsigned char *
-export_ushort_be(
-	unsigned char			*data,
-	int				val)
+
+
+
+
+/****************************************************************************
+ * export_u16_be
+ ****************************************************************************/
+cw_u8_t *
+export_u16_be(
+	cw_u8_t				*data,
+	cw_u16_t			val)
 
 	{
 	data[0] = (val >> 8) & 0xff;
@@ -36,12 +48,12 @@ export_ushort_be(
 
 
 /****************************************************************************
- * export_ushort_le
+ * export_u16_le
  ****************************************************************************/
-unsigned char *
-export_ushort_le(
-	unsigned char			*data,
-	int				val)
+cw_u8_t *
+export_u16_le(
+	cw_u8_t				*data,
+	cw_u16_t			val)
 
 	{
 	data[0] = val & 0xff;
@@ -52,12 +64,12 @@ export_ushort_le(
 
 
 /****************************************************************************
- * export_ulong_le
+ * export_u32_le
  ****************************************************************************/
-unsigned char *
-export_ulong_le(
-	unsigned char			*data,
-	unsigned long			val)
+cw_u8_t *
+export_u32_le(
+	cw_u8_t				*data,
+	cw_u32_t			val)
 
 	{
 	data[0] = val & 0xff;

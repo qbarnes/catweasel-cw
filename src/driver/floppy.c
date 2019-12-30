@@ -1,7 +1,7 @@
 /****************************************************************************
  ****************************************************************************
  *
- * cwfloppy.c
+ * floppy.c
  *
  ****************************************************************************
  ****************************************************************************/
@@ -22,9 +22,10 @@
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
 
-#include "cwfloppy.h"
-#include "cw.h"
-#include "cwhardware.h"
+#include "floppy.h"
+#include "driver.h"
+#include "hardware.h"
+#include "message.h"
 #include "ioctl.h"
 
 
@@ -53,10 +54,10 @@
 
 
 /****************************************************************************
- * cwfloppy_lock
+ * cw_floppy_lock
  ****************************************************************************/
 static int
-cwfloppy_lock(
+cw_floppy_lock(
 	wait_queue_head_t		*wq,
 	spinlock_t			*lock,
 	int				*busy,
@@ -102,10 +103,10 @@ cwfloppy_lock(
 
 
 /****************************************************************************
- * cwfloppy_lock_controller
+ * cw_floppy_lock_controller
  ****************************************************************************/
 static int
-cwfloppy_lock_controller(
+cw_floppy_lock_controller(
 	struct cw_floppies		*fls,
 	int				nonblock)
 
@@ -113,7 +114,7 @@ cwfloppy_lock_controller(
 	int				result;
 
 	cw_debug(1, "[c%d] trying to lock controller", fls->cnt->num);
-	result = cwfloppy_lock(&fls->busy_wq, &fls->lock, &fls->busy, nonblock);
+	result = cw_floppy_lock(&fls->busy_wq, &fls->lock, &fls->busy, nonblock);
 	if (result == 0) cw_debug(1, "[c%d] locking controller", fls->cnt->num);
 	return (result);
 	}
@@ -121,10 +122,10 @@ cwfloppy_lock_controller(
 
 
 /****************************************************************************
- * cwfloppy_unlock_controller
+ * cw_floppy_unlock_controller
  ****************************************************************************/
 static void
-cwfloppy_unlock_controller(
+cw_floppy_unlock_controller(
 	struct cw_floppies		*fls)
 
 	{
@@ -136,10 +137,10 @@ cwfloppy_unlock_controller(
 
 
 /****************************************************************************
- * cwfloppy_lock_floppy
+ * cw_floppy_lock_floppy
  ****************************************************************************/
 static int
-cwfloppy_lock_floppy(
+cw_floppy_lock_floppy(
 	struct cw_floppy		*flp,
 	int				nonblock)
 
@@ -147,7 +148,7 @@ cwfloppy_lock_floppy(
 	int				result;
 
 	cw_debug(1, "[c%df%d] trying to lock floppy", cnt_num, flp->num);
-	result = cwfloppy_lock(&flp->busy_wq, &flp->fls->lock, &flp->busy, nonblock);
+	result = cw_floppy_lock(&flp->busy_wq, &flp->fls->lock, &flp->busy, nonblock);
 	if (result == 0) cw_debug(1, "[c%df%d] locking floppy", cnt_num, flp->num);
 	return (result);
 	}
@@ -155,10 +156,10 @@ cwfloppy_lock_floppy(
 
 
 /****************************************************************************
- * cwfloppy_unlock_floppy
+ * cw_floppy_unlock_floppy
  ****************************************************************************/
 static void
-cwfloppy_unlock_floppy(
+cw_floppy_unlock_floppy(
 	struct cw_floppy		*flp)
 
 	{
@@ -170,25 +171,26 @@ cwfloppy_unlock_floppy(
 
 
 /****************************************************************************
- * cwfloppy_default_parameters
+ * cw_floppy_default_parameters
  ****************************************************************************/
 static struct cw_floppyinfo
-cwfloppy_default_parameters(
+cw_floppy_default_parameters(
 	void)
 
 	{
 	struct cw_floppyinfo		fli =
 		{
-		.version     = CW_STRUCT_VERSION,
-		.settle_time = CW_DEFAULT_SETTLE_TIME,
-		.step_time   = CW_DEFAULT_STEP_TIME,
-		.track_max   = CW_MAX_TRACK,
-		.side_max    = CW_MAX_SIDE,
-		.clock_max   = CW_MAX_CLOCK,
-		.mode_max    = CW_MAX_MODE,
-		.size_max    = CW_MAX_SIZE,
-		.rpm         = 0,
-		.flags       = 0
+		.version       = CW_STRUCT_VERSION,
+		.settle_time   = CW_DEFAULT_SETTLE_TIME,
+		.step_time     = CW_DEFAULT_STEP_TIME,
+		.wpulse_length = CW_DEFAULT_WPULSE_LENGTH,
+		.nr_tracks     = CW_NR_TRACKS,
+		.nr_sides      = CW_NR_SIDES,
+		.nr_clocks     = CW_NR_CLOCKS,
+		.nr_modes      = CW_NR_MODES,
+		.max_size      = CW_MAX_TRACK_SIZE,
+		.rpm           = 0,
+		.flags         = 0
 		};
 
 	return (fli);
@@ -197,10 +199,10 @@ cwfloppy_default_parameters(
 
 
 /****************************************************************************
- * cwfloppy_get_parameters
+ * cw_floppy_get_parameters
  ****************************************************************************/
 static int
-cwfloppy_get_parameters(
+cw_floppy_get_parameters(
 	struct cw_floppy		*flp,
 	struct cw_floppyinfo		*fli,
 	int				nonblock)
@@ -209,20 +211,20 @@ cwfloppy_get_parameters(
 	int				result;
 
 	if (fli->version != CW_STRUCT_VERSION) return (-EINVAL);
-	result = cwfloppy_lock_floppy(flp, nonblock);
+	result = cw_floppy_lock_floppy(flp, nonblock);
 	if (result < 0) return (result);
 	*fli = flp->fli;
-	cwfloppy_unlock_floppy(flp);
+	cw_floppy_unlock_floppy(flp);
 	return (0);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_set_parameters
+ * cw_floppy_set_parameters
  ****************************************************************************/
 static int
-cwfloppy_set_parameters(
+cw_floppy_set_parameters(
 	struct cw_floppy		*flp,
 	struct cw_floppyinfo		*fli,
 	int				nonblock)
@@ -230,54 +232,59 @@ cwfloppy_set_parameters(
 	{
 	int				result;
 
-	if ((fli->track_max < 1) || (fli->track_max > CW_MAX_TRACK) ||
-		(fli->settle_time < CW_MIN_SETTLE_TIME) || (fli->settle_time > CW_MAX_SETTLE_TIME) ||
+	/* check if all values are valid */
+
+	if (fli->version != CW_STRUCT_VERSION) return (-EINVAL);
+	if ((fli->settle_time < CW_MIN_SETTLE_TIME) || (fli->settle_time > CW_MAX_SETTLE_TIME) ||
 		(fli->step_time < CW_MIN_STEP_TIME) || (fli->step_time > CW_MAX_STEP_TIME) ||
-		(fli->side_max < 1) || (fli->side_max > CW_MAX_SIDE) ||
-		(fli->clock_max != flp->fli.clock_max) ||
-		(fli->mode_max != flp->fli.mode_max) ||
-		(fli->size_max != flp->fli.size_max) ||
+		(fli->wpulse_length < CW_MIN_WPULSE_LENGTH) || (fli->wpulse_length > CW_MAX_WPULSE_LENGTH) ||
+		(fli->nr_tracks < 1) || (fli->nr_tracks > CW_NR_TRACKS) ||
+		(fli->nr_sides < 1) || (fli->nr_sides > CW_NR_SIDES) ||
+		(fli->nr_clocks != flp->fli.nr_clocks) ||
+		(fli->nr_modes != flp->fli.nr_modes) ||
+		(fli->max_size != flp->fli.max_size) ||
 		((fli->rpm != 0) && (fli->rpm < CW_MIN_RPM)) || (fli->rpm > CW_MAX_RPM) ||
-		(fli->flags > CW_FLOPPYINFO_FLAG_ALL) ||
-		(fli->version != CW_STRUCT_VERSION)) return (-EINVAL);
-	result = cwfloppy_lock_floppy(flp, nonblock);
+		(fli->flags > CW_FLOPPYINFO_FLAG_ALL)) return (-EINVAL);
+
+	/* copy values to driver data structures */
+
+	result = cw_floppy_lock_floppy(flp, nonblock);
 	if (result < 0) return (result);
-	cw_debug(1, "[c%df%d] settle_time = %d, step_time = %d, track_max = %d, side_max = %d, rpm = %d, flags = 0x%08x",
+	fli->wpulse_length /= CW_WPULSE_LENGTH_MULTIPLIER;
+	fli->wpulse_length *= CW_WPULSE_LENGTH_MULTIPLIER;
+	cw_debug(1, "[c%df%d] settle_time = %d, step_time = %d, wpulse_length = %d, nr_tracks = %d, nr_sides = %d, rpm = %d, flags = 0x%08x",
 		 cnt_num, flp->num, fli->settle_time, fli->step_time,
-		 fli->track_max, fli->side_max, fli->rpm, fli->flags);
-	flp->fli.settle_time = fli->settle_time;
-	flp->fli.step_time   = fli->step_time;
-	flp->fli.track_max   = fli->track_max;
-	flp->fli.side_max    = fli->side_max;
-	flp->fli.rpm         = fli->rpm;
-	flp->fli.flags       = fli->flags;
-	cwfloppy_unlock_floppy(flp);
+		 fli->wpulse_length, fli->nr_tracks, fli->nr_sides,
+		 fli->rpm, fli->flags);
+	flp->fli.settle_time   = fli->settle_time;
+	flp->fli.step_time     = fli->step_time;
+	flp->fli.wpulse_length = fli->wpulse_length;
+	flp->fli.nr_tracks     = fli->nr_tracks;
+	flp->fli.nr_sides      = fli->nr_sides;
+	flp->fli.rpm           = fli->rpm;
+	flp->fli.flags         = fli->flags;
+	cw_floppy_unlock_floppy(flp);
 	return (0);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_check_parameters
+ * cw_floppy_check_parameters
  ****************************************************************************/
 static int
-cwfloppy_check_parameters(
+cw_floppy_check_parameters(
 	struct cw_floppyinfo		*fli,
 	struct cw_trackinfo		*tri,
 	int				write)
 
 	{
-
-	/*
-	 * track_max, side_max, clock_max and mode_max contain the highest
-	 * possible value + 1, size_max contains the maximal allowed size 
-	 */
-
-	if ((tri->version != CW_STRUCT_VERSION) ||
-		(tri->track >= fli->track_max) || (tri->side >= fli->side_max) ||
-		(tri->clock >= fli->clock_max) || (tri->mode >= fli->mode_max) ||
-		(tri->timeout < CW_MIN_TIMEOUT) || (tri->timeout > CW_MAX_TIMEOUT)) return (-EINVAL);
-	if ((write) && ((tri->size > fli->size_max - CW_WRITE_OVERHEAD) ||
+	if (tri->version != CW_STRUCT_VERSION) return (-EINVAL);
+	if ((tri->track_seek >= fli->nr_tracks) || (tri->track >= fli->nr_tracks) ||
+		(tri->side >= fli->nr_sides) || (tri->clock >= fli->nr_clocks) ||
+		(tri->mode >= fli->nr_modes) || (tri->timeout < CW_MIN_TIMEOUT) ||
+		(tri->timeout > CW_MAX_TIMEOUT)) return (-EINVAL);
+	if ((write) && ((tri->size > fli->max_size - CW_WRITE_OVERHEAD) ||
 		(tri->mode == CW_TRACKINFO_MODE_INDEX_STORE))) return (-EINVAL);
 	return (0);
 	}
@@ -285,10 +292,10 @@ cwfloppy_check_parameters(
 
 
 /****************************************************************************
- * cwfloppy_get_density
+ * cw_floppy_get_density
  ****************************************************************************/
 static int
-cwfloppy_get_density(
+cw_floppy_get_density(
 	struct cw_floppy		*flp)
 
 	{
@@ -300,32 +307,32 @@ cwfloppy_get_density(
 /****************************************************************************
  * cwfloppy_add_timer
  ****************************************************************************/
-#define cwfloppy_add_timer(t, e, d)	cwfloppy_add_timer2(t, e, (unsigned long) d)
+#define cwfloppy_add_timer(t, e, d)	cw_floppy_add_timer2(t, e, d)
 
 
 
 /****************************************************************************
- * cwfloppy_add_timer2
+ * cw_floppy_add_timer2
  ****************************************************************************/
 static void
-cwfloppy_add_timer2(
+cw_floppy_add_timer2(
 	struct timer_list		*timer,
 	unsigned long			expires,
-	unsigned long			data)
+	void				*data)
 
 	{
 	timer->expires = expires;
-	timer->data    = data;
+	timer->data    = (cw_ptr_t) data;
 	add_timer(timer);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_motor_wait
+ * cw_floppy_motor_wait
  ****************************************************************************/
 static void
-cwfloppy_motor_wait(
+cw_floppy_motor_wait(
 	struct cw_floppy		*flp)
 
 	{
@@ -338,19 +345,19 @@ cwfloppy_motor_wait(
 
 
 /****************************************************************************
- * cwfloppy_motor_on
+ * cw_floppy_motor_on
  ****************************************************************************/
 static void
-cwfloppy_motor_on(
+cw_floppy_motor_on(
 	struct cw_floppy		*flp)
 
 	{
 	unsigned long			flags;
 
 	/*
-	 * delete pending cwfloppy_motor_timer_func(),
+	 * delete pending cw_floppy_motor_timer_func(),
 	 * set flp->motor_request = 0 under flp->fls->lock, this will
-	 * ensure that no parallel running cwfloppy_mux_timer_func()
+	 * ensure that no parallel running cw_floppy_mux_timer_func()
 	 * already read flp->motor_request and changes the state of
 	 * flp->motor after we checked flp->motor
 	 */
@@ -372,25 +379,25 @@ cwfloppy_motor_on(
 	 */
 
 	spin_lock_irqsave(&flp->fls->lock, flags);
-	cwhardware_floppy_motor_on(&cnt_hrd, flp->num);
+	cw_hardware_floppy_motor_on(&cnt_hrd, flp->num);
 	spin_unlock_irqrestore(&flp->fls->lock, flags);
-	cwfloppy_motor_wait(flp);
+	cw_floppy_motor_wait(flp);
 	flp->motor = 1;
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_motor_timer_func
+ * cw_floppy_motor_timer_func
  ****************************************************************************/
 static void
-cwfloppy_motor_timer_func(
+cw_floppy_motor_timer_func(
 	unsigned long			arg)
 
 	{
 	struct cw_floppy		*flp = (struct cw_floppy *) arg;
 
-	/* just signal cwfloppy_mux_timer_func() to switch motor off */
+	/* just signal cw_floppy_mux_timer_func() to switch motor off */
 
 	cw_debug(2, "[c%df%d] preparing to switch motor off", cnt_num, flp->num);
 	flp->motor_request = 1;
@@ -399,18 +406,18 @@ cwfloppy_motor_timer_func(
 
 
 /****************************************************************************
- * cwfloppy_motor_off
+ * cw_floppy_motor_off
  ****************************************************************************/
 static void
-cwfloppy_motor_off(
+cw_floppy_motor_off(
 	struct cw_floppy		*flp)
 
 	{
 
 	/*
-	 * always called after cwfloppy_motor_on(), so there is no
-	 * cwfloppy_motor_timer_func() running from a previous
-	 * cwfloppy_motor_off()-call
+	 * always called after cw_floppy_motor_on(), so there is no
+	 * cw_floppy_motor_timer_func() running from a previous
+	 * cw_floppy_motor_off()-call
 	 */
 
 	cw_debug(2, "[c%df%d] registering motor_timer", cnt_num, flp->num);
@@ -420,10 +427,10 @@ cwfloppy_motor_off(
 
 
 /****************************************************************************
- * cwfloppy_step_timer_func
+ * cw_floppy_step_timer_func
  ****************************************************************************/
 static void
-cwfloppy_step_timer_func(
+cw_floppy_step_timer_func(
 	unsigned long			arg)
 
 	{
@@ -444,7 +451,7 @@ cwfloppy_step_timer_func(
 	if (flp->track_wanted < 0)
 		{
 		cw_debug(2, "[c%df%d] doing explicit track0 sensing", cnt_num, flp->num);
-		if (cwhardware_floppy_track0(&cnt_hrd))
+		if (cw_hardware_floppy_track0(&cnt_hrd))
 			{
 			flp->track        = 0;
 			flp->track_wanted = 0;
@@ -468,9 +475,9 @@ cwfloppy_step_timer_func(
 	if (! spin_is_locked(&flp->fls->lock))
 		{
 		spin_lock(&flp->fls->lock);
-		cwhardware_floppy_step(&cnt_hrd, 1, direction);
+		cw_hardware_floppy_step(&cnt_hrd, 1, direction);
 		udelay(50);
-		cwhardware_floppy_step(&cnt_hrd, 0, direction);
+		cw_hardware_floppy_step(&cnt_hrd, 0, direction);
 		spin_unlock(&flp->fls->lock);
 		flp->track += direction ? 1 : -1;
 		if (flp->track_wanted != flp->track) time = flp->fli.step_time;
@@ -485,10 +492,10 @@ done:
 
 
 /****************************************************************************
- * cwfloppy_step
+ * cw_floppy_step
  ****************************************************************************/
 static int
-cwfloppy_step(
+cw_floppy_step(
 	struct cw_floppy		*flp,
 	int				track_wanted)
 
@@ -505,34 +512,34 @@ cwfloppy_step(
 
 
 /****************************************************************************
- * cwfloppy_dummy_step
+ * cw_floppy_dummy_step
  ****************************************************************************/
 static int
-cwfloppy_dummy_step(
+cw_floppy_dummy_step(
 	struct cw_floppy		*flp)
 
 	{
 	int				track = flp->track;
 	int				ofs = (track > 0) ? 1 : -1;
 
-	cwfloppy_step(flp, track - ofs);
-	cwfloppy_step(flp, track + ofs);
+	cw_floppy_step(flp, track - ofs);
+	cw_floppy_step(flp, track + ofs);
 	return (1);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_calibrate
+ * cw_floppy_calibrate
  ****************************************************************************/
 static int
-cwfloppy_calibrate(
+cw_floppy_calibrate(
 	struct cw_floppy		*flp)
 
 	{
 	flp->track = 0;
-	cwfloppy_step(flp, 3);
-	cwfloppy_step(flp, -CW_MAX_TRACK);
+	cw_floppy_step(flp, 3);
+	cw_floppy_step(flp, -CW_NR_TRACKS);
 	flp->track_dirty = 0;
 	return (1);
 	}
@@ -540,10 +547,10 @@ cwfloppy_calibrate(
 
 
 /****************************************************************************
- * cwfloppy_get_model
+ * cw_floppy_get_model
  ****************************************************************************/
 static int
-cwfloppy_get_model(
+cw_floppy_get_model(
 	struct cw_floppy		*flp)
 
 	{
@@ -553,23 +560,23 @@ cwfloppy_get_model(
 	 * is off
 	 */
 
-	cwhardware_floppy_motor_on(&cnt_hrd, flp->num);
-	cwfloppy_motor_wait(flp);
+	cw_hardware_floppy_motor_on(&cnt_hrd, flp->num);
+	cw_floppy_motor_wait(flp);
 
 	/*
 	 * a floppy is present if we get a track0 signal while moving
-	 * the head (seek), this routine is only called from cwfloppy_init(),
+	 * the head (seek), this routine is only called from cw_floppy_init(),
 	 * so no concurrent accesses to the control register via
 	 * cwhardware_*()-functions may happen, so no protection with
 	 * flp->fls->lock is needed
 	 */
 
-	cwhardware_floppy_select(&cnt_hrd, flp->num, 0, cwfloppy_get_density(flp));
-	cwfloppy_calibrate(flp);
+	cw_hardware_floppy_select(&cnt_hrd, flp->num, 0, cw_floppy_get_density(flp));
+	cw_floppy_calibrate(flp);
 
 	/* this automatically deselects the floppy */
 
-	cwhardware_floppy_motor_off(&cnt_hrd, flp->num);
+	cw_hardware_floppy_motor_off(&cnt_hrd, flp->num);
 	if (flp->track == 0) return (CW_FLOPPY_MODEL_AUTO);
 	return (CW_FLOPPY_MODEL_NONE);
 	}
@@ -577,10 +584,10 @@ cwfloppy_get_model(
 
 
 /****************************************************************************
- * cwfloppy_mux_timer_func
+ * cw_floppy_mux_timer_func
  ****************************************************************************/
 static void
-cwfloppy_mux_timer_func(
+cw_floppy_mux_timer_func(
 	unsigned long			arg)
 
 	{
@@ -598,7 +605,7 @@ cwfloppy_mux_timer_func(
 
 	if (spin_is_locked(&fls->lock)) goto done;
 	spin_lock(&fls->lock);
-	for (f = 0, open = fls->open; f < CW_MAX_FLOPPIES_PER_CONTROLLER; f++)
+	for (f = 0, open = fls->open; f < CW_NR_FLOPPIES_PER_CONTROLLER; f++)
 		{
 		flp = &fls->flp[f];
 		if (flp->model == CW_FLOPPY_MODEL_NONE) continue;
@@ -607,14 +614,14 @@ cwfloppy_mux_timer_func(
 			open += flp->motor;
 			continue;
 			}
-		cwhardware_floppy_motor_off(&cnt_hrd, flp->num);
+		cw_hardware_floppy_motor_off(&cnt_hrd, flp->num);
 		flp->motor_request = 0;
 		flp->motor         = 0;
 		}
 	if ((! fls->mux) && (! open))
 		{
-		cwhardware_floppy_host_select(&cnt_hrd);
-		cwhardware_floppy_mux_on(&fls->cnt->hrd);
+		cw_hardware_floppy_host_select(&cnt_hrd);
+		cw_hardware_floppy_mux_on(&fls->cnt->hrd);
 		fls->mux = 1;
 		}
 	spin_unlock(&fls->lock);
@@ -627,10 +634,10 @@ done:
 
 
 /****************************************************************************
- * cwfloppy_rw_timer_func
+ * cw_floppy_rw_timer_func
  ****************************************************************************/
 static void
-cwfloppy_rw_timer_func(
+cw_floppy_rw_timer_func(
 	unsigned long			arg)
 
 	{
@@ -643,7 +650,7 @@ cwfloppy_rw_timer_func(
 	 * busy and floppy is now not busy)
 	 */
 
-	busy = cwhardware_floppy_busy(&cnt_hrd);
+	busy = cw_hardware_floppy_busy(&cnt_hrd);
 	if ((! busy) && (flp->fls->rw_latch))
 		{
 		flp->fls->rw_timeout = 0;
@@ -666,7 +673,7 @@ cwfloppy_rw_timer_func(
 
 	if (flp->fls->rw_timeout <= 0)
 		{
-		cwhardware_floppy_abort(&cnt_hrd);
+		cw_hardware_floppy_abort(&cnt_hrd);
 		flp->fls->rw_timeout = -1;
 done:
 		wake_up(&flp->fls->rw_wq);
@@ -681,10 +688,10 @@ done:
 
 
 /****************************************************************************
- * cwfloppy_read_write_track
+ * cw_floppy_read_write_track
  ****************************************************************************/
 static int
-cwfloppy_read_write_track(
+cw_floppy_read_write_track(
 	struct cw_floppy		*flp,
 	struct cw_trackinfo		*tri,
 	int				nonblock,
@@ -694,16 +701,22 @@ cwfloppy_read_write_track(
 	int				result, aborted = 0, stepped = 0;
 	unsigned long			flags;
 
-	/* motor on, lock controller, select floppy and move head */
+	/*
+	 * motor on, lock controller, select floppy and move head to
+	 * track_seek. with this "preposition track" it is possible to
+	 * specify the direction from which a track is reached, because
+	 * depending on drive hardware it may influence the final head
+	 * position if the track was stepped on from left or right
+	 */
 
-	cwfloppy_motor_on(flp);
-	result = cwfloppy_lock_controller(flp->fls, nonblock);
+	cw_floppy_motor_on(flp);
+	result = cw_floppy_lock_controller(flp->fls, nonblock);
 	if (result < 0) goto done2;
 	spin_lock_irqsave(&flp->fls->lock, flags);
-	cwhardware_floppy_select(&cnt_hrd, flp->num, tri->side, cwfloppy_get_density(flp));
+	cw_hardware_floppy_select(&cnt_hrd, flp->num, tri->side, cw_floppy_get_density(flp));
 	spin_unlock_irqrestore(&flp->fls->lock, flags);
-	if (flp->track_dirty) stepped = cwfloppy_calibrate(flp);
-	stepped |= cwfloppy_step(flp, tri->track);
+	if (flp->track_dirty) stepped = cw_floppy_calibrate(flp);
+	stepped |= cw_floppy_step(flp, tri->track_seek);
 
 	/*
 	 * check if disk is in drive. a set disk change flag means the disk
@@ -717,27 +730,31 @@ cwfloppy_read_write_track(
 
 		invert = (flp->fli.flags & CW_FLOPPYINFO_FLAG_INVERTED_DISKCHANGE) ? 1 : 0;
 		result = -EIO;
-		while ((cwhardware_floppy_disk_changed(&cnt_hrd) ^ invert) != 0)
+		while ((cw_hardware_floppy_disk_changed(&cnt_hrd) ^ invert) != 0)
 			{
 			if (stepped) goto done;
-			stepped = cwfloppy_dummy_step(flp);
+			stepped = cw_floppy_dummy_step(flp);
 			}
 		}
 
+	/* move head to final destination */
+
+	cw_floppy_step(flp, tri->track);
+	
 	/* start reading or writing now */
 
 	if (write)
 		{
-		if (cwhardware_floppy_write_protected(&cnt_hrd)) result = -EROFS;
-		else result = cwhardware_floppy_write_track(&cnt_hrd, tri->clock, tri->mode, flp->track_data, tri->size);
+		if (cw_hardware_floppy_write_protected(&cnt_hrd)) result = -EROFS;
+		else result = cw_hardware_floppy_write_track(&cnt_hrd, tri->clock, tri->mode, flp->fli.wpulse_length, flp->track_data, tri->size);
 		if (result < 0) goto done;
 		}
-	else cwhardware_floppy_read_track_start(&cnt_hrd, tri->clock, tri->mode);
+	else cw_hardware_floppy_read_track_start(&cnt_hrd, tri->clock, tri->mode);
 
 	/* wait until operation finished or timed out */
 
 	cw_debug(1, "[c%df%d] registering floppies_rw_timer", cnt_num, flp->num);
-	flp->fls->rw_latch   = cwhardware_floppy_busy(&cnt_hrd);
+	flp->fls->rw_latch   = cw_hardware_floppy_busy(&cnt_hrd);
 	flp->fls->rw_jiffies = jiffies;
 	flp->fls->rw_timeout = tri->timeout;
 	cwfloppy_add_timer(&flp->fls->rw_timer, jiffies + 2, flp);
@@ -755,23 +772,23 @@ cwfloppy_read_write_track(
 	 */
 
 	if (write) result -= aborted;
-	else result = cwhardware_floppy_read_track_copy(&cnt_hrd, flp->track_data, tri->size);
+	else result = cw_hardware_floppy_read_track_copy(&cnt_hrd, flp->track_data, tri->size);
 
 	/* done */
 done:
-	cwfloppy_unlock_controller(flp->fls);
+	cw_floppy_unlock_controller(flp->fls);
 done2:
-	cwfloppy_motor_off(flp);
+	cw_floppy_motor_off(flp);
 	return (result);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_read_track
+ * cw_floppy_read_track
  ****************************************************************************/
 static int
-cwfloppy_read_track(
+cw_floppy_read_track(
 	struct cw_floppy		*flp,
 	struct cw_trackinfo		*tri,
 	int				nonblock)
@@ -781,28 +798,28 @@ cwfloppy_read_track(
 
 	/* check parameters */
 
-	result = cwfloppy_check_parameters(&flp->fli, tri, 0);
+	result = cw_floppy_check_parameters(&flp->fli, tri, 0);
 	if (result < 0) return (result);
 	if (tri->size == 0) return (0);
 	if (! access_ok(VERIFY_WRITE, tri->data, tri->size)) return (-EFAULT);
 
 	/* read track and copy data to user space */
 
-	result = cwfloppy_lock_floppy(flp, nonblock);
+	result = cw_floppy_lock_floppy(flp, nonblock);
 	if (result < 0) return (result);
-	result = cwfloppy_read_write_track(flp, tri, nonblock, 0);
+	result = cw_floppy_read_write_track(flp, tri, nonblock, 0);
 	if ((result > 0) && (copy_to_user(tri->data, flp->track_data, result) != 0)) result = -EFAULT;
-	cwfloppy_unlock_floppy(flp);
+	cw_floppy_unlock_floppy(flp);
 	return (result);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_write_track
+ * cw_floppy_write_track
  ****************************************************************************/
 static int
-cwfloppy_write_track(
+cw_floppy_write_track(
 	struct cw_floppy		*flp,
 	struct cw_trackinfo		*tri,
 	int				nonblock)
@@ -812,28 +829,28 @@ cwfloppy_write_track(
 
 	/* check parameters */
 
-	result = cwfloppy_check_parameters(&flp->fli, tri, 1);
+	result = cw_floppy_check_parameters(&flp->fli, tri, 1);
 	if (result < 0) return (result);
 	if (tri->size == 0) return (0);
 	if (! access_ok(VERIFY_READ, tri->data, tri->size)) return (-EFAULT);
 
 	/* copy data from user space and write track */
 
-	result = cwfloppy_lock_floppy(flp, nonblock);
+	result = cw_floppy_lock_floppy(flp, nonblock);
 	if (result < 0) return (result);
 	result = -EFAULT;
-	if (copy_from_user(flp->track_data, tri->data, tri->size) == 0) result = cwfloppy_read_write_track(flp, tri, nonblock, 1);
-	cwfloppy_unlock_floppy(flp);
+	if (copy_from_user(flp->track_data, tri->data, tri->size) == 0) result = cw_floppy_read_write_track(flp, tri, nonblock, 1);
+	cw_floppy_unlock_floppy(flp);
 	return (result);
 	}
 
 
 
 /****************************************************************************
- * cwfloppy_char_open
+ * cw_floppy_char_open
  ****************************************************************************/
 static int
-cwfloppy_char_open(
+cw_floppy_char_open(
 	struct inode			*inode,
 	struct file			*file)
 
@@ -845,9 +862,9 @@ cwfloppy_char_open(
 	unsigned long			flags;
 
 	cw_debug(1, "[c%df%d] open()", get_controller(minor), get_floppy(minor));
-	fls = cw_get_floppies(get_controller(minor));
+	fls = cw_driver_get_floppies(get_controller(minor));
 	f   = get_floppy(minor);
-	if ((fls == NULL) || (f >= CW_MAX_FLOPPIES_PER_CONTROLLER)) return (-ENODEV);
+	if ((fls == NULL) || (f >= CW_NR_FLOPPIES_PER_CONTROLLER)) return (-ENODEV);
 	flp = &fls->flp[f];
 	if ((get_format(minor) != CW_FLOPPY_FORMAT_RAW) || (flp->model == CW_FLOPPY_MODEL_NONE)) return (-ENODEV);
 
@@ -861,8 +878,8 @@ cwfloppy_char_open(
 	 */
 
 	spin_lock_irqsave(&fls->lock, flags);
-	select1 = cwhardware_floppy_host_select(&cnt_hrd);
-	select2 = cwhardware_floppy_host_select(&cnt_hrd);
+	select1 = cw_hardware_floppy_host_select(&cnt_hrd);
+	select2 = cw_hardware_floppy_host_select(&cnt_hrd);
 	select1 |= select2;
 	if (fls->mux)
 		{
@@ -873,7 +890,7 @@ cwfloppy_char_open(
 			spin_unlock_irqrestore(&fls->lock, flags);
 			return (-EBUSY);
 			}
-		cwhardware_floppy_mux_off(&cnt_hrd);
+		cw_hardware_floppy_mux_off(&cnt_hrd);
 		fls->mux = 0;
 		}
 	fls->open++;
@@ -889,10 +906,10 @@ cwfloppy_char_open(
 
 
 /****************************************************************************
- * cwfloppy_char_release
+ * cw_floppy_char_release
  ****************************************************************************/
 static int
-cwfloppy_char_release(
+cw_floppy_char_release(
 	struct inode			*inode,
 	struct file			*file)
 
@@ -910,10 +927,10 @@ cwfloppy_char_release(
 
 
 /****************************************************************************
- * cwfloppy_char_ioctl
+ * cw_floppy_char_ioctl
  ****************************************************************************/
 static ssize_t
-cwfloppy_char_ioctl(
+cw_floppy_char_ioctl(
 	struct inode			*inode,
 	struct file			*file,
 	unsigned int			cmd,
@@ -929,8 +946,15 @@ cwfloppy_char_ioctl(
 	if (cmd == CW_IOC_GFLPARM)
 		{
 		cw_debug(1, "[c%df%d] ioctl(CW_IOC_GFLPARM, ...)", cnt_num, flp->num);
+
+		/*
+		 * need to allow O_WRONLY here, because on write we use
+		 * CW_IOC_GFLPARM while holding the device open with
+		 * O_WRONLY
+		 */
+
 		result = -EFAULT;
-		if (copy_from_user(&fli, (void *) arg, sizeof (struct cw_floppyinfo)) == 0) result = cwfloppy_get_parameters(flp, &fli, nonblock);
+		if (copy_from_user(&fli, (void *) arg, sizeof (struct cw_floppyinfo)) == 0) result = cw_floppy_get_parameters(flp, &fli, nonblock);
 		if ((result == 0) && (copy_to_user((void *) arg, &fli, sizeof (struct cw_floppyinfo)) != 0)) result = -EFAULT;
 		}
 	else if (cmd == CW_IOC_SFLPARM)
@@ -938,21 +962,21 @@ cwfloppy_char_ioctl(
 		cw_debug(1, "[c%df%d] ioctl(CW_IOC_SFLPARM, ...)", cnt_num, flp->num);
 		if ((file->f_flags & O_ACCMODE) == O_RDONLY) return (-EPERM);
 		result = -EFAULT;
-		if (copy_from_user(&fli, (void *) arg, sizeof (struct cw_floppyinfo)) == 0) result = cwfloppy_set_parameters(flp, &fli, nonblock);
+		if (copy_from_user(&fli, (void *) arg, sizeof (struct cw_floppyinfo)) == 0) result = cw_floppy_set_parameters(flp, &fli, nonblock);
 		}
 	else if (cmd == CW_IOC_READ)
 		{
 		cw_debug(1, "[c%df%d] ioctl(CW_IOC_READ, ...)", cnt_num, flp->num);
 		if ((file->f_flags & O_ACCMODE) == O_WRONLY) return (-EPERM);
 		result = -EFAULT;
-		if (copy_from_user(&tri, (void *) arg, sizeof (struct cw_trackinfo)) == 0) result = cwfloppy_read_track(flp, &tri, nonblock);
+		if (copy_from_user(&tri, (void *) arg, sizeof (struct cw_trackinfo)) == 0) result = cw_floppy_read_track(flp, &tri, nonblock);
 		}
 	else if (cmd == CW_IOC_WRITE)
 		{
 		cw_debug(1, "[c%df%d] ioctl(CW_IOC_WRITE, ...)", cnt_num, flp->num);
 		if ((file->f_flags & O_ACCMODE) == O_RDONLY) return (-EPERM);
 		result = -EFAULT;
-		if (copy_from_user(&tri, (void *) arg, sizeof (struct cw_trackinfo)) == 0) result = cwfloppy_write_track(flp, &tri, nonblock);
+		if (copy_from_user(&tri, (void *) arg, sizeof (struct cw_trackinfo)) == 0) result = cw_floppy_write_track(flp, &tri, nonblock);
 		}
 	return (result);
 	}
@@ -960,23 +984,23 @@ cwfloppy_char_ioctl(
 
 
 /****************************************************************************
- * cwfloppy_fops
+ * cw_floppy_fops
  ****************************************************************************/
-struct file_operations			cwfloppy_fops =
+struct file_operations			cw_floppy_fops =
 	{
 	.owner   = THIS_MODULE,
-	.open    = cwfloppy_char_open,
-	.release = cwfloppy_char_release,
-	.ioctl   = cwfloppy_char_ioctl
+	.open    = cw_floppy_char_open,
+	.release = cw_floppy_char_release,
+	.ioctl   = cw_floppy_char_ioctl
 	};
 
 
 
 /****************************************************************************
- * cwfloppy_init
+ * cw_floppy_init
  ****************************************************************************/
 int
-cwfloppy_init(
+cw_floppy_init(
 	struct cw_floppies		*fls)
 
 	{
@@ -988,8 +1012,8 @@ cwfloppy_init(
 	 * read gives the current state
 	 */
 
-	cwhardware_floppy_host_select(&fls->cnt->hrd);
-	if (cwhardware_floppy_host_select(&fls->cnt->hrd))
+	cw_hardware_floppy_host_select(&fls->cnt->hrd);
+	if (cw_hardware_floppy_host_select(&fls->cnt->hrd))
 		{
 		cw_error("[c%d] could not access floppy, host controller currently uses it", fls->cnt->num);
 		return (-EBUSY);
@@ -997,7 +1021,7 @@ cwfloppy_init(
 
 	/* disallow host controller accesses */
 
-	cwhardware_floppy_mux_off(&fls->cnt->hrd);
+	cw_hardware_floppy_mux_off(&fls->cnt->hrd);
 
 	/* per controller initialization */
 
@@ -1008,13 +1032,13 @@ cwfloppy_init(
 	init_timer(&fls->step_timer);
 	init_timer(&fls->mux_timer);
 	init_timer(&fls->rw_timer);
-	fls->step_timer.function = cwfloppy_step_timer_func;
-	fls->mux_timer.function  = cwfloppy_mux_timer_func;
-	fls->rw_timer.function   = cwfloppy_rw_timer_func;
+	fls->step_timer.function = cw_floppy_step_timer_func;
+	fls->mux_timer.function  = cw_floppy_mux_timer_func;
+	fls->rw_timer.function   = cw_floppy_rw_timer_func;
 
 	/* per floppy initialization */
 
-	for (f = 0; f < CW_MAX_FLOPPIES_PER_CONTROLLER; f++)
+	for (f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; f++)
 		{
 		flp      = &fls->flp[f];
 		flp->num = f;
@@ -1022,13 +1046,13 @@ cwfloppy_init(
 		cw_debug(1, "[c%df%d] initializing", cnt_num, flp->num);
 		init_waitqueue_head(&flp->busy_wq);
 		init_timer(&flp->motor_timer);
-		flp->fli                  = cwfloppy_default_parameters();
-		flp->motor_timer.function = cwfloppy_motor_timer_func;
-		flp->model                = cwfloppy_get_model(flp);
+		flp->fli                  = cw_floppy_default_parameters();
+		flp->motor_timer.function = cw_floppy_motor_timer_func;
+		flp->model                = cw_floppy_get_model(flp);
 		if (flp->model == CW_FLOPPY_MODEL_NONE) continue;
 
 		cw_notice("[c%df%d] floppy found at 0x%04x", cnt_num, flp->num, cnt_hrd.iobase);
-		flp->track_data = (u8 *) vmalloc(flp->fli.size_max);
+		flp->track_data = (cw_raw_t *) vmalloc(flp->fli.max_size);
 		if (flp->track_data != NULL) continue;
 
 		cw_error("[c%df%d] could not allocate memory for track buffer", cnt_num, flp->num);
@@ -1037,7 +1061,7 @@ cwfloppy_init(
 
 	/* now host controller accesses are allowed again */
 
-	cwhardware_floppy_mux_on(&fls->cnt->hrd);
+	cw_hardware_floppy_mux_on(&fls->cnt->hrd);
 	fls->mux = 1;
 	cwfloppy_add_timer(&fls->mux_timer, jiffies + 2, fls);
 	return (0);
@@ -1046,10 +1070,10 @@ cwfloppy_init(
 
 
 /****************************************************************************
- * cwfloppy_exit
+ * cw_floppy_exit
  ****************************************************************************/
 void
-cwfloppy_exit(
+cw_floppy_exit(
 	struct cw_floppies		*fls)
 
 	{
@@ -1057,7 +1081,7 @@ cwfloppy_exit(
 	int				f;
 
 	del_timer_sync(&fls->mux_timer);
-	for (f = 0; f < CW_MAX_FLOPPIES_PER_CONTROLLER; f++)
+	for (f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; f++)
 		{
 		flp = &fls->flp[f];
 		if (flp->model == CW_FLOPPY_MODEL_NONE) continue;
@@ -1065,12 +1089,12 @@ cwfloppy_exit(
 		cw_debug(1, "[c%df%d] deinitializing", cnt_num, flp->num);
 		del_timer_sync(&flp->motor_timer);
 		flp->motor_request = 0;
-		if (flp->motor) cwhardware_floppy_motor_off(&cnt_hrd, flp->num);
+		if (flp->motor) cw_hardware_floppy_motor_off(&cnt_hrd, flp->num);
 		if (flp->track_data == NULL) continue;
 
 		vfree(flp->track_data);
 		}
-	cwhardware_floppy_mux_on(&fls->cnt->hrd);
+	cw_hardware_floppy_mux_on(&fls->cnt->hrd);
 	fls->mux = 1;
 	}
 /******************************************************** Karsten Scheibler */

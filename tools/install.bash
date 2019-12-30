@@ -391,7 +391,7 @@ elif [ "$PROGRAM_NAME" = "upgrade.bash" ]; then
 	create_device_nodes "/lib/udev/devices"
 	create_device_nodes "/etc/udev/devices"
 	modify_static_devices
-else
+elif [ "$PROGRAM_NAME" = "uninstall.bash" ]; then
 	[ -f .uninstall ] && . .uninstall
 	remove_file "$BIN_DIR/cwtool"
 	remove_file "$MODULE_DIR/$MODULE_NAME.o"
@@ -403,6 +403,8 @@ else
 	remove_device_nodes "/lib/udev/devices"
 	remove_device_nodes "/etc/udev/devices"
 	cleanup_static_devices
+else
+	echo "unknown program name '$PROGRAM_NAME'" 2>&1
 fi
 exit 0
 ######################################################### Karsten Scheibler #

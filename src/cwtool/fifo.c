@@ -17,6 +17,8 @@
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
+#include "global.h"
+#include "options.h"
 
 
 

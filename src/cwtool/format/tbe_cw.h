@@ -10,10 +10,12 @@
 
 
 
-#ifndef CWTOOL_TBE_CW_H
-#define CWTOOL_TBE_CW_H
+#ifndef CWTOOL_FORMAT_TBE_CW_H
+#define CWTOOL_FORMAT_TBE_CW_H
 
+#include "types.h"
 #include "bounds.h"
+#include "desc.h"
 
 struct tbe_cw
 	{
@@ -40,17 +42,9 @@ struct tbe_cw
 		}			rw;
 	};
 
-/*
- * do not put this include at the beginning of the file, because ../format.h
- * also includes this file to construct union format. so the above struct
- * has to be known at time of inclusion
- */
-
-#include "../format.h"
-
 extern struct format_desc		tbe_cw_format_desc;
 
 
 
-#endif /* !CWTOOL_TBE_CW_H */
+#endif /* !CWTOOL_FORMAT_TBE_CW_H */
 /******************************************************** Karsten Scheibler */

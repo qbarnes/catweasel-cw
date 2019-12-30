@@ -16,6 +16,8 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 
@@ -40,7 +42,7 @@ mfm_read_8data_bits(
 	clock ^= clock << 1;
 	if ((clock & 0xaaaa) != 0xaaaa)
 		{
-		verbose(3, "wrong mfm clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
+		verbose_message(GENERIC, 3, "wrong mfm clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
 		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 		}
 	return ((mfmfm_decode_table[(data >> 8) & 0x55] << 4) | mfmfm_decode_table[data & 0x55]);

@@ -16,7 +16,8 @@
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
-#include "cwtool.h"
+#include "global.h"
+#include "options.h"
 #include "file.h"
 #include "setvalue.h"
 #include "string.h"
@@ -26,7 +27,7 @@
 
 /****************************************************************************
  *
- * misc helper functions
+ * local functions
  *
  ****************************************************************************/
 
@@ -44,14 +45,15 @@ drive_init_device(
 	struct file			fil;
 	struct cw_floppyinfo		fli = CW_FLOPPYINFO_INIT;
 
-	verbose(1, "initializing '%s'", drv->path);
+	verbose_message(GENERIC, 1, "initializing '%s'", drv->path);
 	file_open(&fil, drv->path, FILE_MODE_WRITE, FILE_FLAG_NONE);
 	file_ioctl(&fil, CW_IOC_GFLPARM, &fli, FILE_FLAG_NONE);
-	fli.step_time   = drv->fli.step_time;
-	fli.settle_time = drv->fli.settle_time;
-	fli.track_max   = drv->fli.track_max;
-	fli.side_max    = drv->fli.side_max;
-	fli.flags       = drv->fli.flags;
+	fli.step_time     = drv->fli.step_time;
+	fli.settle_time   = drv->fli.settle_time;
+	fli.wpulse_length = drv->fli.wpulse_length;
+	fli.nr_tracks     = drv->fli.nr_tracks;
+	fli.nr_sides      = drv->fli.nr_sides;
+	fli.flags         = drv->fli.flags;
 	file_ioctl(&fil, CW_IOC_SFLPARM, &fli, FILE_FLAG_NONE);
 	file_close(&fil);
 	return (1);
@@ -62,7 +64,7 @@ drive_init_device(
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -77,13 +79,13 @@ drive_get(
 	int				i)
 
 	{
-	static struct drive		drv[CWTOOL_MAX_DRIVE];
+	static struct drive		drv[GLOBAL_NR_DRIVES];
 	static int			drives;
 
 	if (i == -1)
 		{
-		if (drives >= CWTOOL_MAX_DRIVE) error_message("too many drives defined");
-		debug(1, "request for unused drive struct, drives = %d", drives);
+		if (drives >= GLOBAL_NR_DRIVES) error_message("too many drives defined");
+		debug_message(GENERIC, 1, "request for unused drive struct, drives = %d", drives);
 		return (&drv[drives++]);
 		}
 	if ((i >= 0) && (i < drives)) return (&drv[i]);
@@ -115,18 +117,20 @@ drive_search(
 int
 drive_init(
 	struct drive			*drv,
-	int				version)
+	int				revision)
 
 	{
 	*drv = (struct drive)
 		{
-		.version = version,
-		.fli     =
+		.revision = revision,
+		.fli      =
 			{
-			.settle_time = CW_DEFAULT_SETTLE_TIME,
-			.step_time   = CW_DEFAULT_STEP_TIME,
-			.track_max   = CW_MAX_TRACK,
-			.side_max    = CW_MAX_SIDE
+			.settle_time   = CW_DEFAULT_SETTLE_TIME,
+			.step_time     = CW_DEFAULT_STEP_TIME,
+			.wpulse_length = CW_DEFAULT_WPULSE_LENGTH,
+			.nr_tracks     = CW_NR_TRACKS,
+			.nr_sides      = CW_NR_SIDES,
+			.flags         = CW_FLOPPYINFO_FLAG_NONE
 			}
 		};
 	return (1);
@@ -163,8 +167,8 @@ drive_set_path(
 	{
 	struct drive			*drv2 = drive_search(path);
 
-	if (drv2 != NULL) if (drv->version <= drv2->version) return (0);
-	string_copy(drv->path, CWTOOL_MAX_PATH_LEN, path);
+	if (drv2 != NULL) if (drv->revision <= drv2->revision) return (0);
+	string_copy(drv->path, GLOBAL_MAX_PATH_SIZE, path);
 	return (1);
 	}
 
@@ -179,7 +183,7 @@ drive_set_info(
 	const char			*info)
 
 	{
-	string_copy(drv->info, CWTOOL_MAX_NAME_LEN, info);
+	string_copy(drv->info, GLOBAL_MAX_NAME_SIZE, info);
 	return (1);
 	}
 
@@ -194,7 +198,7 @@ drive_set_settle_time(
 	int				val)
 
 	{
-	return (setvalue_uint(&drv->fli.settle_time, val, CW_MIN_SETTLE_TIME, CW_MAX_SETTLE_TIME));
+	return (setvalue_int(&drv->fli.settle_time, val, CW_MIN_SETTLE_TIME, CW_MAX_SETTLE_TIME));
 	}
 
 
@@ -208,7 +212,21 @@ drive_set_step_time(
 	int				val)
 
 	{
-	return (setvalue_uint(&drv->fli.step_time, val, CW_MIN_STEP_TIME, CW_MAX_STEP_TIME));
+	return (setvalue_int(&drv->fli.step_time, val, CW_MIN_STEP_TIME, CW_MAX_STEP_TIME));
+	}
+
+
+
+/****************************************************************************
+ * drive_set_wpulse_length
+ ****************************************************************************/
+int
+drive_set_wpulse_length(
+	struct drive			*drv,
+	int				val)
+
+	{
+	return (setvalue_int(&drv->fli.wpulse_length, val, CW_MIN_WPULSE_LENGTH, CW_MAX_WPULSE_LENGTH));
 	}
 
 

@@ -16,6 +16,8 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
+#include "../global.h"
+#include "../options.h"
 #include "../fifo.h"
 #include "../file.h"
 #include "../image.h"
@@ -96,7 +98,7 @@ image_plain_read(
 	debug_error_condition(! file_is_readable(&img->pln.fil));
 	fifo_set_wr_ofs(ffo, size);
 	if (img->pln.flags & FLAG_END_SEEN) goto done;
-	verbose(1, "reading plain track %d with %d bytes from '%s'", track, size, file_get_path(&img->pln.fil));
+	verbose_message(GENERIC, 1, "reading plain track %d with %d bytes from '%s'", track, size, file_get_path(&img->pln.fil));
 	size = file_read(&img->pln.fil, fifo_get_data(ffo), size);
 	img->pln.offset += size;
 	if (size == fifo_get_limit(ffo)) goto done;
@@ -124,7 +126,7 @@ image_plain_write(
 	int				size = fifo_get_wr_ofs(ffo);
 
 	debug_error_condition(! file_is_writable(&img->pln.fil));
-	verbose(1, "writing plain track %d with %d bytes to '%s'", track, size, file_get_path(&img->pln.fil));
+	verbose_message(GENERIC, 1, "writing plain track %d with %d bytes to '%s'", track, size, file_get_path(&img->pln.fil));
 	file_write(&img->pln.fil, fifo_get_data(ffo), size);
 	fifo_set_rd_ofs(ffo, size);
 	img->pln.offset += size;
@@ -152,7 +154,7 @@ image_plain_done(
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -166,6 +168,7 @@ struct image_desc			image_plain_desc =
 	{
 	.name        = "plain",
 	.level       = 3,
+	.flags       = IMAGE_FLAG_CONTINUOUS_TRACK,
 	.open        = image_plain_open,
 	.close       = image_plain_close,
 	.offset      = image_plain_offset,

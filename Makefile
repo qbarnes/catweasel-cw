@@ -1,9 +1,5 @@
-MAKE=make
-BASH=bash
-RM=rm -f
-INSTALL=${BASH} tools/install.bash
-UPGRADE=${BASH} tools/upgrade.bash
-UNINSTALL=${BASH} tools/uninstall.bash
+PREFIX:=.
+include ${PREFIX}/Makefile.conf
 
 .PHONY: all clean
 
@@ -15,10 +11,10 @@ clean:
 	${MAKE} -C src clean
 
 install:
-	${INSTALL}
+	${INSTALL_BASH}
 
 upgrade:
-	${UPGRADE}
+	${UPGRADE_BASH}
 
 uninstall:
-	${UNINSTALL}
+	${UNINSTALL_BASH}

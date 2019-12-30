@@ -10,8 +10,8 @@
 
 
 
-#ifndef CWTOOL_FM_H
-#define CWTOOL_FM_H
+#ifndef CWTOOL_FORMAT_FM_H
+#define CWTOOL_FORMAT_FM_H
 
 #include "mfmfm.h"
 
@@ -23,9 +23,9 @@ extern int				fm_write_8data_bits(struct fifo *, int);
 
 #define fm_decode_table						mfmfm_decode_table
 #define fm_encode_table						mfmfm_encode_table
-#define fm_read_ushort_be(data)					mfmfm_read_ushort_be(data)
-#define fm_write_ushort_be(data, val)				mfmfm_write_ushort_be(data, val)
-#define fm_read_sync(ffo, val1, val2)				mfmfm_read_sync2(ffo, val1, val2)
+#define fm_read_u16_be(data)					mfmfm_read_u16_be(data)
+#define fm_write_u16_be(data, val)				mfmfm_write_u16_be(data, val)
+#define fm_read_sync(ffo, range, val1, val2)			mfmfm_read_sync2(ffo, range, val1, val2)
 #define fm_write_sync(ffo, val, size)				mfmfm_write_sync(ffo, val, size)
 #define fm_write_fill(ffo, val, size)				mfmfm_write_fill(ffo, val, size, fm_write_8data_bits)
 #define fm_read_bytes(ffo, err, data, size)			mfmfm_read_bytes(ffo, err, data, size, fm_read_8data_bits)
@@ -37,5 +37,5 @@ extern int				fm_write_8data_bits(struct fifo *, int);
 
 
 
-#endif /* !CWTOOL_FM_H */
+#endif /* !CWTOOL_FORMAT_FM_H */
 /******************************************************** Karsten Scheibler */

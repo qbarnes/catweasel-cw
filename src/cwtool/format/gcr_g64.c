@@ -16,11 +16,15 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
-#include "../cwtool.h"
+#include "../global.h"
+#include "../options.h"
 #include "../disk.h"
 #include "../fifo.h"
 #include "../format.h"
-#include "raw.h"
+#include "container.h"
+#include "bitstream.h"
+#include "postcomp_simple.h"
+#include "histogram.h"
 #include "setvalue.h"
 
 
@@ -67,7 +71,7 @@ gcr_read_sync(
 		}
 found:
 	fifo_set_rd_bitofs(ffo_l1, fifo_get_rd_bitofs(ffo_l1) - j);
-	verbose(2, "got sync at bit offset %d with %d bits", fifo_get_rd_bitofs(ffo_l1) - i, i);
+	verbose_message(GENERIC, 2, "got sync at bit offset %d with %d bits", fifo_get_rd_bitofs(ffo_l1) - i, i);
 	return (i);
 	}
 
@@ -83,7 +87,7 @@ gcr_write_fill(
 	int				size)
 
 	{
-	verbose(2, "writing fill at offset %d with value 0x%02x", fifo_get_wr_ofs(ffo_l1), val);
+	verbose_message(GENERIC, 2, "writing fill at offset %d with value 0x%02x", fifo_get_wr_ofs(ffo_l1), val);
 	while (size-- > 0) if (fifo_write_byte(ffo_l1, val) == -1) return (-1);
 	return (0);
 	}
@@ -100,10 +104,10 @@ gcr_write_fill(
 
 
 
-#define MAX_SYNCS			(4 * CWTOOL_MAX_SECTOR)
+#define MAX_SYNCS			(4 * GLOBAL_NR_SECTORS)
 #define FLAG_STRIP_TRACK		(1 << 0)
 #define FLAG_ALIGN_TRACK		(1 << 1)
-#define FLAG_POSTCOMP			(1 << 2)
+#define FLAG_POSTCOMP_SIMPLE		(1 << 2)
 
 
 
@@ -136,20 +140,20 @@ gcr_g64_eliminate_gap(
 	 * eliminate the track gap
 	 */
 
-	verbose(3, "starting track gap elimination, found %d sectors", sectors);
+	verbose_message(GENERIC, 3, "starting track gap elimination, found %d sectors", sectors);
 	for (i = s = max1 = 0; s < sectors; s++) if (size[s] > max1) max1 = size[s], i = s;
 	for (j = s = max2 = 0; s < sectors; s++) if ((s != i) && (size[s] > max2)) max2 = size[s], j = s;
 	for (s = max3 = 0; s < sectors; s++) if ((s != i) && (s != j) && (size[s] > max3)) max3 = size[s];
-	verbose(3, "replacing size %d with %d at %d. sector", max1, max3, i + 1);
+	verbose_message(GENERIC, 3, "replacing size %d with %d at %d. sector", max1, max3, i + 1);
 	size[i] = max3;
-	verbose(3, "replacing size %d with %d at %d. sector", max2, max3, j + 1);
+	verbose_message(GENERIC, 3, "replacing size %d with %d at %d. sector", max2, max3, j + 1);
 	size[j] = max3;
 
 	/* now copy each sector */
 
 	for (s = 0; s < sectors; s++)
 		{
-		verbose(3, "copying %d. sector at offset %d with size %d", s + 1, start[s], size[s]);
+		verbose_message(GENERIC, 3, "copying %d. sector at offset %d with size %d", s + 1, start[s], size[s]);
 		if (fifo_write_block(ffo_dst, &fifo_get_data(ffo_src)[start[s]], size[s]) == -1) return (-1);
 		}
 
@@ -191,8 +195,8 @@ gcr_g64_strip_track(
 
 	{
 	unsigned int			pattern, p;
-	int				start[CWTOOL_MAX_SECTOR];
-	int				size[CWTOOL_MAX_SECTOR];
+	int				start[GLOBAL_NR_SECTORS];
+	int				size[GLOBAL_NR_SECTORS];
 	int				l, s;
 
 	/*
@@ -207,24 +211,24 @@ gcr_g64_strip_track(
 	 *   bytes
 	 */
 
-	for (s = 0; s < CWTOOL_MAX_SECTOR; s++) size[s] = limit;
+	for (s = 0; s < GLOBAL_NR_SECTORS; s++) size[s] = limit;
 	for (s = pattern = 0; ; )
 		{
 		l = gcr_read_sync(ffo_src, gcr_g64->rd.sync_length);
 		if (l == -1) goto eliminate_gap;
 		if (fifo_read_bits(ffo_src, 8) != gcr_g64->rd.header_raw_id) continue;
-		if (s >= CWTOOL_MAX_SECTOR) break;
+		if (s >= GLOBAL_NR_SECTORS) break;
 		start[s] = fifo_get_rd_ofs(ffo_src) - ((l + 7) / 8) - 2;
 		if (start[s] < 0) start[s] = 0;
 		if (start[s] > limit) break;
 		if (s > 0) size[s - 1] = start[s] - start[s - 1];
 		p = gcr_g64_get_pattern(ffo_src);
 		if (p == 0) goto eliminate_gap;
-		verbose(3, "found pattern 0x%08x around offset %d", p, start[s]);
+		verbose_message(GENERIC, 3, "found pattern 0x%08x around offset %d", p, start[s]);
 		if (++s == 1) pattern = p;
 		if ((s == 1) || (pattern != p)) continue;
 		s--;
-		verbose(3, "disk rotation complete around offset %d", start[s]);
+		verbose_message(GENERIC, 3, "disk rotation complete around offset %d", start[s]);
 
 	eliminate_gap:
 		if (s < 3) break;
@@ -234,11 +238,11 @@ gcr_g64_strip_track(
 
 	/* track gap postprocessing failed, we have to take track as it is */
 
-	verbose(1, "taking track as is, without any postprocessing");
+	verbose_message(GENERIC, 1, "taking track as is, without any postprocessing");
 	s = fifo_get_wr_ofs(ffo_src) - 1;
 	if (s > limit)
 		{
-		verbose(1, "track too large, needed to truncate it");
+		verbose_message(GENERIC, 1, "track too large, needed to truncate it");
 		s = limit;
 		}
 	if (fifo_write_block(ffo_dst, fifo_get_data(ffo_src), s) == -1) return (-1);
@@ -265,7 +269,7 @@ gcr_g64_align_bits(
 		{
 		val |= 1 << (bits - 1);
 		val &= (1 << bits) - 1;
-		verbose(3, "inserting 0x%02x with %d bits", val, bits);
+		verbose_message(GENERIC, 3, "inserting 0x%02x with %d bits", val, bits);
 		if (fifo_write_bits(ffo, val, bits) == -1) return (-1);
 		}
 	return (bits);
@@ -282,7 +286,7 @@ gcr_g64_align_track(
 	struct gcr_g64			*gcr_g64)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
+	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
 	struct fifo			ffo_tmp = FIFO_INIT(data, sizeof (data));
 	int				size[MAX_SYNCS];
 	int				end[MAX_SYNCS];
@@ -290,7 +294,7 @@ gcr_g64_align_track(
 
 	/* check if track is already aligned */
 
-	verbose(3, "checking track alignment");
+	verbose_message(GENERIC, 3, "checking track alignment");
 	size[0] = 0;
 	end[0]  = 0;
 	for (i = l = 0, s = 1; (l != -1) && (s < MAX_SYNCS); i += j & 7, s++)
@@ -304,7 +308,7 @@ gcr_g64_align_track(
 
 	/* align syncs so that bytes after it start on byte boundaries */
 
-	verbose(3, "starting track alignment");
+	verbose_message(GENERIC, 3, "starting track alignment");
 	fifo_copy_block(ffo, &ffo_tmp, fifo_get_wr_ofs(ffo));
 	fifo_reset(ffo);
 	for (i = 1, j = 0; i < s; i++)
@@ -313,7 +317,7 @@ gcr_g64_align_track(
 		if (l == -1) return (-1);
 		j += l;
 		l = (end[i] - size[i]) - (end[i - 1] - size[i - 1]);
-		verbose(3, "copying %d bits", l);
+		verbose_message(GENERIC, 3, "copying %d bits", l);
 		fifo_copy_bitblock(&ffo_tmp, ffo, l);
 		}
 	if (gcr_g64_align_bits(ffo, fifo_get_wr_bitofs(ffo)) == -1) return (-1);
@@ -330,14 +334,15 @@ static int
 gcr_g64_statistics(
 	union format			*fmt,
 	struct fifo			*ffo_l0,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	int				speed = fmt->gcr_g64.rd.speed;
 
-	raw_histogram(ffo_l0, track, track);
-	raw_precomp_statistics(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3);
-	if (fmt->gcr_g64.rd.flags & FLAG_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3, track, track);
+	histogram_normal(ffo_l0, cwtool_track, -1, -1);
+	if (fmt->gcr_g64.rd.flags & FLAG_POSTCOMP_SIMPLE) histogram_postcomp_simple(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3, cwtool_track, -1, -1);
 	return (1);
 	}
 
@@ -349,14 +354,17 @@ gcr_g64_statistics(
 static int
 gcr_g64_read_track(
 	union format			*fmt,
+	struct container		*con,
 	struct fifo			*ffo_l0,
 	struct fifo			*ffo_l1,
 	struct disk_sector		*dsk_sct,
-	int				track)
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
 	int				length[4]   = { 6250, 6667, 7143, 7692 };
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
+	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
 	struct fifo			ffo_l1_tmp  = FIFO_INIT(data, sizeof (data));
 	int				pad_length2 = fmt->gcr_g64.rd.pad_length2;
 	int				limit       = fifo_get_limit(ffo_l1) - fmt->gcr_g64.rd.pad_length1 - pad_length2;
@@ -368,8 +376,8 @@ gcr_g64_read_track(
 	 */
 
 	debug_error_condition((speed < 0) || (speed > 3));
-	if (fmt->gcr_g64.rd.flags & FLAG_POSTCOMP) raw_postcomp(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3);
-	raw_read(ffo_l0, &ffo_l1_tmp, fmt->gcr_g64.rw.bnd[speed], 3);
+	if (fmt->gcr_g64.rd.flags & FLAG_POSTCOMP_SIMPLE) postcomp_simple(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3);
+	bitstream_read(ffo_l0, &ffo_l1_tmp, fmt->gcr_g64.rw.bnd[speed], 3);
 	if (gcr_write_fill(ffo_l1, fmt->gcr_g64.rd.pad_value1, fmt->gcr_g64.rd.pad_length1) == -1) return (0);
 	if (fmt->gcr_g64.rd.flags & FLAG_STRIP_TRACK) if (gcr_g64_strip_track(&ffo_l1_tmp, &fmt->gcr_g64, ffo_l1, limit) == -1) return (0);
 	if (fmt->gcr_g64.rd.flags & FLAG_ALIGN_TRACK) if (gcr_g64_align_track(ffo_l1, &fmt->gcr_g64) == -1) return (0);
@@ -397,11 +405,14 @@ gcr_g64_write_track(
 	struct fifo			*ffo_l1,
 	struct disk_sector		*dsk_sct,
 	struct fifo			*ffo_l0,
-	int				track)
+	unsigned char			*data,
+	cw_count_t			cwtool_track,
+	cw_count_t			format_track,
+	cw_count_t			format_side)
 
 	{
-	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
-	struct fifo			ffo_l1_tmp = FIFO_INIT(data, sizeof (data));
+	unsigned char			data_l1_tmp[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo_l1_tmp = FIFO_INIT(data_l1_tmp, sizeof (data_l1_tmp));
 	int				limit      = fifo_get_limit(&ffo_l1_tmp) - fmt->gcr_g64.wr.prolog_length - fmt->gcr_g64.wr.epilog_length;
 	int				speed      = fifo_get_speed(ffo_l1);
 
@@ -415,7 +426,7 @@ gcr_g64_write_track(
 	if (fmt->gcr_g64.wr.flags & FLAG_STRIP_TRACK) if (gcr_g64_strip_track(ffo_l1, &fmt->gcr_g64, &ffo_l1_tmp, limit) == -1) return (0);
 	if (gcr_write_fill(&ffo_l1_tmp, fmt->gcr_g64.wr.epilog_value, fmt->gcr_g64.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1_tmp);
-	if (raw_write(&ffo_l1_tmp, ffo_l0, fmt->gcr_g64.rw.bnd[speed], fmt->gcr_g64.wr.precomp[speed], 3) == -1) return (0);
+	if (bitstream_write(&ffo_l1_tmp, ffo_l0, fmt->gcr_g64.rw.bnd[speed], fmt->gcr_g64.wr.precomp[speed], 3) == -1) return (0);
 	return (1);
 	}
 
@@ -433,7 +444,7 @@ gcr_g64_write_track(
 
 #define MAGIC_STRIP_TRACK		1
 #define MAGIC_ALIGN_TRACK		2
-#define MAGIC_POSTCOMP			3
+#define MAGIC_POSTCOMP_SIMPLE		3
 #define MAGIC_SYNC_LENGTH		4
 #define MAGIC_PAD_LENGTH1		5
 #define MAGIC_PAD_LENGTH2		6
@@ -445,10 +456,14 @@ gcr_g64_write_track(
 #define MAGIC_PRECOMP1			12
 #define MAGIC_PRECOMP2			13
 #define MAGIC_PRECOMP3			14
-#define MAGIC_BOUNDS0			15
-#define MAGIC_BOUNDS1			16
-#define MAGIC_BOUNDS2			17
-#define MAGIC_BOUNDS3			18
+#define MAGIC_BOUNDS0_OLD		15
+#define MAGIC_BOUNDS1_OLD		16
+#define MAGIC_BOUNDS2_OLD		17
+#define MAGIC_BOUNDS3_OLD		18
+#define MAGIC_BOUNDS0_NEW		19
+#define MAGIC_BOUNDS1_NEW		20
+#define MAGIC_BOUNDS2_NEW		21
+#define MAGIC_BOUNDS3_NEW		22
 
 
 
@@ -486,30 +501,30 @@ gcr_g64_set_defaults(
 			.bnd =
 				{
 					{
-					BOUNDS(0x0800, 0x1700, 0x2200, 0),
-					BOUNDS(0x2300, 0x2e00, 0x3900, 1),
-					BOUNDS(0x3a00, 0x4500, 0x5000, 2)
+					BOUNDS_NEW(0x1300, 0x1600, 0x2200, 0),
+					BOUNDS_NEW(0x2300, 0x2d00, 0x3900, 1),
+					BOUNDS_NEW(0x3a00, 0x4400, 0x5000, 2)
 					},
 					{
-					BOUNDS(0x0800, 0x1600, 0x2000, 0),
-					BOUNDS(0x2100, 0x2c00, 0x3700, 1),
-					BOUNDS(0x3800, 0x4200, 0x5000, 2)
+					BOUNDS_NEW(0x1200, 0x1500, 0x2000, 0),
+					BOUNDS_NEW(0x2100, 0x2b00, 0x3700, 1),
+					BOUNDS_NEW(0x3800, 0x4100, 0x5000, 2)
 					},
 					{
-					BOUNDS(0x0800, 0x1500, 0x1f00, 0),
-					BOUNDS(0x2000, 0x2a00, 0x3400, 1),
-					BOUNDS(0x3500, 0x3f00, 0x5000, 2)
+					BOUNDS_NEW(0x1100, 0x1400, 0x1f00, 0),
+					BOUNDS_NEW(0x2000, 0x2900, 0x3400, 1),
+					BOUNDS_NEW(0x3500, 0x3e00, 0x5000, 2)
 					},
 					{
-					BOUNDS(0x0800, 0x1300, 0x1c00, 0),
-					BOUNDS(0x1d00, 0x2600, 0x2f00, 1),
-					BOUNDS(0x3000, 0x3900, 0x5000, 2)
+					BOUNDS_NEW(0x0f00, 0x1200, 0x1c00, 0),
+					BOUNDS_NEW(0x1d00, 0x2500, 0x2f00, 1),
+					BOUNDS_NEW(0x3000, 0x3800, 0x4800, 2)
 					}
 				}
 			}
 		};
 
-	debug(2, "setting defaults");
+	debug_message(GENERIC, 2, "setting defaults");
 	fmt->gcr_g64 = gcr_g64;
 	}
 
@@ -526,14 +541,14 @@ gcr_g64_set_read_option(
 	int				ofs)
 
 	{
-	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
-	if (magic == MAGIC_STRIP_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_STRIP_TRACK));
-	if (magic == MAGIC_ALIGN_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_ALIGN_TRACK));
-	if (magic == MAGIC_POSTCOMP)      return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_POSTCOMP));
-	if (magic == MAGIC_SYNC_LENGTH)   return (setvalue_uchar(&fmt->gcr_g64.rd.sync_length, val, 9, 0xff));
-	if (magic == MAGIC_PAD_LENGTH1)   return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length1, val, 0, 0xff));
-	if (magic == MAGIC_PAD_LENGTH2)   return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length2, val, 0, 0xff));
-	if (magic == MAGIC_HEADER_RAW_ID) return (setvalue_uchar(&fmt->gcr_g64.rd.header_raw_id, val, 0, 0xff));
+	debug_message(GENERIC, 2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	if (magic == MAGIC_STRIP_TRACK)     return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_STRIP_TRACK));
+	if (magic == MAGIC_ALIGN_TRACK)     return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_ALIGN_TRACK));
+	if (magic == MAGIC_POSTCOMP_SIMPLE) return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_POSTCOMP_SIMPLE));
+	if (magic == MAGIC_SYNC_LENGTH)     return (setvalue_uchar(&fmt->gcr_g64.rd.sync_length, val, 9, 0xff));
+	if (magic == MAGIC_PAD_LENGTH1)     return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length1, val, 0, 0xff));
+	if (magic == MAGIC_PAD_LENGTH2)     return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length2, val, 0, 0xff));
+	if (magic == MAGIC_HEADER_RAW_ID)   return (setvalue_uchar(&fmt->gcr_g64.rd.header_raw_id, val, 0, 0xff));
 	debug_error_condition(magic != MAGIC_SPEED);
 	return (setvalue_uchar(&fmt->gcr_g64.rd.speed, val, 0, 3));
 	}
@@ -551,7 +566,7 @@ gcr_g64_set_write_option(
 	int				ofs)
 
 	{
-	debug(2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	debug_message(GENERIC, 2, "setting write option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_PROLOG_LENGTH) return (setvalue_ushort(&fmt->gcr_g64.wr.prolog_length, val, 0, 0xffff));
 	if (magic == MAGIC_EPILOG_LENGTH) return (setvalue_ushort(&fmt->gcr_g64.wr.epilog_length, val, 8, 0xffff));
 	if (magic == MAGIC_STRIP_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.wr.flags, val, FLAG_STRIP_TRACK));
@@ -575,12 +590,16 @@ gcr_g64_set_rw_option(
 	int				ofs)
 
 	{
-	debug(2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
-	if (magic == MAGIC_BOUNDS0) return (setvalue_bounds(fmt->gcr_g64.rw.bnd[0], val, ofs));
-	if (magic == MAGIC_BOUNDS1) return (setvalue_bounds(fmt->gcr_g64.rw.bnd[1], val, ofs));
-	if (magic == MAGIC_BOUNDS2) return (setvalue_bounds(fmt->gcr_g64.rw.bnd[2], val, ofs));
-	debug_error_condition(magic != MAGIC_BOUNDS3);
-	return (setvalue_bounds(fmt->gcr_g64.rw.bnd[3], val, ofs));
+	debug_message(GENERIC, 2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
+	if (magic == MAGIC_BOUNDS0_OLD) return (setvalue_bounds_old(fmt->gcr_g64.rw.bnd[0], val, ofs));
+	if (magic == MAGIC_BOUNDS1_OLD) return (setvalue_bounds_old(fmt->gcr_g64.rw.bnd[1], val, ofs));
+	if (magic == MAGIC_BOUNDS2_OLD) return (setvalue_bounds_old(fmt->gcr_g64.rw.bnd[2], val, ofs));
+	if (magic == MAGIC_BOUNDS3_OLD) return (setvalue_bounds_old(fmt->gcr_g64.rw.bnd[3], val, ofs));
+	if (magic == MAGIC_BOUNDS0_NEW) return (setvalue_bounds_new(fmt->gcr_g64.rw.bnd[0], val, ofs));
+	if (magic == MAGIC_BOUNDS1_NEW) return (setvalue_bounds_new(fmt->gcr_g64.rw.bnd[1], val, ofs));
+	if (magic == MAGIC_BOUNDS2_NEW) return (setvalue_bounds_new(fmt->gcr_g64.rw.bnd[2], val, ofs));
+	debug_error_condition(magic != MAGIC_BOUNDS3_NEW);
+	return (setvalue_bounds_new(fmt->gcr_g64.rw.bnd[3], val, ofs));
 	}
 
 
@@ -627,18 +646,45 @@ gcr_g64_get_flags(
 
 
 /****************************************************************************
+ * gcr_g64_get_data_offset
+ ****************************************************************************/
+static int
+gcr_g64_get_data_offset(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
+ * gcr_g64_get_data_size
+ ****************************************************************************/
+static int
+gcr_g64_get_data_size(
+	union format			*fmt)
+
+	{
+	return (-1);
+	}
+
+
+
+/****************************************************************************
  * gcr_g64_read_options
  ****************************************************************************/
 static struct format_option		gcr_g64_read_options[] =
 	{
-	FORMAT_OPTION_BOOLEAN("strip_track",   MAGIC_STRIP_TRACK,   1),
-	FORMAT_OPTION_BOOLEAN("align_track",   MAGIC_ALIGN_TRACK,   1),
-	FORMAT_OPTION_BOOLEAN("postcomp",      MAGIC_POSTCOMP,      1),
-	FORMAT_OPTION_INTEGER("sync_length",   MAGIC_SYNC_LENGTH,   1),
-	FORMAT_OPTION_INTEGER("pad_length1",   MAGIC_PAD_LENGTH1,   1),
-	FORMAT_OPTION_INTEGER("pad_length2",   MAGIC_PAD_LENGTH2,   1),
-	FORMAT_OPTION_INTEGER("header_raw_id", MAGIC_HEADER_RAW_ID, 1),
-	FORMAT_OPTION_INTEGER("speed",         MAGIC_SPEED,         1),
+	FORMAT_OPTION_BOOLEAN("strip_track",     MAGIC_STRIP_TRACK,     1),
+	FORMAT_OPTION_BOOLEAN("align_track",     MAGIC_ALIGN_TRACK,     1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",        MAGIC_POSTCOMP_SIMPLE, 1),
+	FORMAT_OPTION_BOOLEAN("postcomp_simple", MAGIC_POSTCOMP_SIMPLE, 1),
+	FORMAT_OPTION_INTEGER("sync_length",     MAGIC_SYNC_LENGTH,     1),
+	FORMAT_OPTION_INTEGER("pad_length1",     MAGIC_PAD_LENGTH1,     1),
+	FORMAT_OPTION_INTEGER("pad_length2",     MAGIC_PAD_LENGTH2,     1),
+	FORMAT_OPTION_INTEGER("header_raw_id",   MAGIC_HEADER_RAW_ID,   1),
+	FORMAT_OPTION_INTEGER("speed",           MAGIC_SPEED,           1),
 	FORMAT_OPTION_END
 	};
 
@@ -666,10 +712,18 @@ static struct format_option		gcr_g64_write_options[] =
  ****************************************************************************/
 static struct format_option		gcr_g64_rw_options[] =
 	{
-	FORMAT_OPTION_INTEGER("bounds0", MAGIC_BOUNDS0, 9),
-	FORMAT_OPTION_INTEGER("bounds1", MAGIC_BOUNDS1, 9),
-	FORMAT_OPTION_INTEGER("bounds2", MAGIC_BOUNDS2, 9),
-	FORMAT_OPTION_INTEGER("bounds3", MAGIC_BOUNDS3, 9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds0",     MAGIC_BOUNDS0_OLD, 9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds1",     MAGIC_BOUNDS1_OLD, 9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds2",     MAGIC_BOUNDS2_OLD, 9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds3",     MAGIC_BOUNDS3_OLD, 9),
+	FORMAT_OPTION_INTEGER("bounds0_old", MAGIC_BOUNDS0_OLD, 9),
+	FORMAT_OPTION_INTEGER("bounds1_old", MAGIC_BOUNDS1_OLD, 9),
+	FORMAT_OPTION_INTEGER("bounds2_old", MAGIC_BOUNDS2_OLD, 9),
+	FORMAT_OPTION_INTEGER("bounds3_old", MAGIC_BOUNDS3_OLD, 9),
+	FORMAT_OPTION_INTEGER("bounds0_new", MAGIC_BOUNDS0_NEW, 9),
+	FORMAT_OPTION_INTEGER("bounds1_new", MAGIC_BOUNDS1_NEW, 9),
+	FORMAT_OPTION_INTEGER("bounds2_new", MAGIC_BOUNDS2_NEW, 9),
+	FORMAT_OPTION_INTEGER("bounds3_new", MAGIC_BOUNDS3_NEW, 9),
 	FORMAT_OPTION_END
 	};
 
@@ -678,7 +732,7 @@ static struct format_option		gcr_g64_rw_options[] =
 
 /****************************************************************************
  *
- * used by external callers
+ * global functions
  *
  ****************************************************************************/
 
@@ -699,6 +753,8 @@ struct format_desc			gcr_g64_format_desc =
 	.get_sectors      = gcr_g64_get_sectors,
 	.get_sector_size  = gcr_g64_get_sector_size,
 	.get_flags        = gcr_g64_get_flags,
+	.get_data_offset  = gcr_g64_get_data_offset,
+	.get_data_size    = gcr_g64_get_data_size,
 	.track_statistics = gcr_g64_statistics,
 	.track_read       = gcr_g64_read_track,
 	.track_write      = gcr_g64_write_track,

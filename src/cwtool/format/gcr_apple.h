@@ -10,10 +10,12 @@
 
 
 
-#ifndef CWTOOL_GCR_APPLE_H
-#define CWTOOL_GCR_APPLE_H
+#ifndef CWTOOL_FORMAT_GCR_APPLE_H
+#define CWTOOL_FORMAT_GCR_APPLE_H
 
+#include "types.h"
 #include "bounds.h"
+#include "desc.h"
 
 struct gcr_apple
 	{
@@ -44,17 +46,9 @@ struct gcr_apple
 		}			rw;
 	};
 
-/*
- * do not put this include at the beginning of the file, because ../format.h
- * also includes this file to construct union format. so the above struct
- * has to be known at time of inclusion
- */
-
-#include "../format.h"
-
 extern struct format_desc		gcr_apple_format_desc;
 
 
 
-#endif /* !CWTOOL_GCR_APPLE_H */
+#endif /* !CWTOOL_FORMAT_GCR_APPLE_H */
 /******************************************************** Karsten Scheibler */

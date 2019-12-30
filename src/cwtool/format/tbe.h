@@ -10,16 +10,18 @@
 
 
 
-#ifndef CWTOOL_TBE_H
-#define CWTOOL_TBE_H
+#ifndef CWTOOL_FORMAT_TBE_H
+#define CWTOOL_FORMAT_TBE_H
 
-#include "mfmfm.h"
+#include "../import.h"
+#include "../export.h"
+#include "crc16.h"
 
-#define tbe_read_ushort_be(data)	mfmfm_read_ushort_be(data)
-#define tbe_write_ushort_be(data, val)	mfmfm_write_ushort_be(data, val)
-#define tbe_crc16(init, data, size)	mfmfm_crc16(init, data, size)
+#define tbe_read_u16_be(data)		import_u16_be(data)
+#define tbe_write_u16_be(data, val)	export_u16_be(data, val)
+#define tbe_crc16(init, data, size)	format_crc16(init, data, size)
 
 
 
-#endif /* !CWTOOL_TBE_H */
+#endif /* !CWTOOL_FORMAT_TBE_H */
 /******************************************************** Karsten Scheibler */

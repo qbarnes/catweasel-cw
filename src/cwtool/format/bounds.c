@@ -16,14 +16,60 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
+#include "../global.h"
+#include "../options.h"
 
 
 
 /****************************************************************************
- * bounds_set_read_low
+ * bounds_old_set_read_low
  ****************************************************************************/
 int
-bounds_set_read_low(
+bounds_old_set_read_low(
+	struct bounds			*bnd_last,
+	struct bounds			*bnd,
+	int				read_low)
+
+	{
+	return (bounds_new_set_read_low(bnd_last, bnd, read_low));
+	}
+
+
+
+/****************************************************************************
+ * bounds_old_set_write
+ ****************************************************************************/
+int
+bounds_old_set_write(
+	struct bounds			*bnd,
+	int				write)
+
+	{
+	if (write >= 0x0400) write -= 0x0100;
+	return (bounds_new_set_write(bnd, write));
+	}
+
+
+
+/****************************************************************************
+ * bounds_old_set_read_high
+ ****************************************************************************/
+int
+bounds_old_set_read_high(
+	struct bounds			*bnd,
+	int				read_high)
+
+	{
+	return (bounds_new_set_read_high(bnd, read_high));
+	}
+
+
+
+/****************************************************************************
+ * bounds_new_set_read_low
+ ****************************************************************************/
+int
+bounds_new_set_read_low(
 	struct bounds			*bnd_last,
 	struct bounds			*bnd,
 	int				read_low)
@@ -38,10 +84,10 @@ bounds_set_read_low(
 
 
 /****************************************************************************
- * bounds_set_write
+ * bounds_new_set_write
  ****************************************************************************/
 int
-bounds_set_write(
+bounds_new_set_write(
 	struct bounds			*bnd,
 	int				write)
 
@@ -54,10 +100,10 @@ bounds_set_write(
 
 
 /****************************************************************************
- * bounds_set_read_high
+ * bounds_new_set_read_high
  ****************************************************************************/
 int
-bounds_set_read_high(
+bounds_new_set_read_high(
 	struct bounds			*bnd,
 	int				read_high)
 

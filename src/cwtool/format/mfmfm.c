@@ -16,8 +16,10 @@
 #include "../error.h"
 #include "../debug.h"
 #include "../verbose.h"
+#include "../global.h"
 #include "../disk.h"
 #include "../fifo.h"
+#include "range.h"
 
 
 
@@ -58,6 +60,7 @@ const int				mfmfm_encode_table[0x10] =
 int
 mfmfm_read_sync(
 	struct fifo			*ffo_l1,
+	struct range			*rng,
 	int				val,
 	int				size)
 
@@ -80,12 +83,13 @@ mfmfm_read_sync(
 			{
 			if ((bits & 0xffff) != val) continue;
 			fifo_set_rd_bitofs(ffo_l1, fifo_get_rd_bitofs(ffo_l1) - i);
-			verbose(3, "first sync found at bit offset %d with value 0x%04x", fifo_get_rd_bitofs(ffo_l1) - 16, val);
+			verbose_message(GENERIC, 3, "first sync found at bit offset %d with value 0x%04x", fifo_get_rd_bitofs(ffo_l1) - 16, val);
 			j = 1;
 			break;
 			}
 		}
-	verbose(2, "got %d sync(s) at bit offset %d with value 0x%04x", size, fifo_get_rd_bitofs(ffo_l1) - 16 * size, val);
+	verbose_message(GENERIC, 2, "got %d sync(s) at bit offset %d with value 0x%04x", size, fifo_get_rd_bitofs(ffo_l1) - 16 * size, val);
+	range_set_start(rng, fifo_get_rd_bitofs(ffo_l1) - 16 * size);
 	return (j);
 	}
 
@@ -97,6 +101,7 @@ mfmfm_read_sync(
 int
 mfmfm_read_sync2(
 	struct fifo			*ffo_l1,
+	struct range			*rng,
 	int				val1,
 	int				val2)
 
@@ -118,7 +123,8 @@ mfmfm_read_sync2(
 		}
 found:
 	fifo_set_rd_bitofs(ffo_l1, fifo_get_rd_bitofs(ffo_l1) - i);
-	verbose(2, "got sync at bit offset %d with value 0x%04x", fifo_get_rd_bitofs(ffo_l1) - 16, val);
+	verbose_message(GENERIC, 2, "got sync at bit offset %d with value 0x%04x", fifo_get_rd_bitofs(ffo_l1) - 16, val);
+	range_set_start(rng, fifo_get_rd_bitofs(ffo_l1) - 16);
 	return ((val == val1) ? 0 : 1);
 	}
 
@@ -134,7 +140,7 @@ mfmfm_write_sync(
 	int				size)
 
 	{
-	verbose(2, "writing sync at bit offset %d with value 0x%04x", fifo_get_wr_bitofs(ffo_l1), val);
+	verbose_message(GENERIC, 2, "writing sync at bit offset %d with value 0x%04x", fifo_get_wr_bitofs(ffo_l1), val);
 	while (size-- > 0) if (fifo_write_bits(ffo_l1, val, 16) == -1) return (-1);
 	return (0);
 	}
@@ -152,7 +158,7 @@ mfmfm_write_fill(
 	int				(*write_func)(struct fifo *, int))
 
 	{
-	verbose(2, "writing fill at bit offset %d with value 0x%02x", fifo_get_wr_bitofs(ffo_l1), val);
+	verbose_message(GENERIC, 2, "writing fill at bit offset %d with value 0x%02x", fifo_get_wr_bitofs(ffo_l1), val);
 	while (size-- > 0) if (write_func(ffo_l1, val) == -1) return (-1);
 	return (0);
 	}
@@ -180,7 +186,7 @@ mfmfm_read_bytes(
 		if (d == -1) return (-1);
 		data[i] = d;
 		}
-	verbose(2, "read %d bytes at bit offset %d with", i, bitofs);
+	verbose_message(GENERIC, 2, "read %d bytes at bit offset %d with", i, bitofs);
 	return (0);
 	}
 
@@ -199,41 +205,9 @@ mfmfm_write_bytes(
 	{
 	int				i;
 
-	verbose(2, "writing %d bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
+	verbose_message(GENERIC, 2, "writing %d bytes at bit offset %d", size, fifo_get_wr_bitofs(ffo_l1));
 	for (i = 0; i < size; i++) write_func(ffo_l1, data[i]);
 	return (0);
-	}
-
-
-
-/****************************************************************************
- * mfmfm_crc16
- ****************************************************************************/
-int
-mfmfm_crc16(
-	int				initval,
-	const unsigned char		*data,
-	int				size)
-
-	{
-	int				byte, table;
-	static const int		lookup[16] =
-		{
-		0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
-		0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF
-		};
-
-	/* x^16 + x^12 + x^5 + x^0 = 0x1021 (x^16 is left out) */
-
-	while (size-- > 0)
-		{
-		byte    = *data++;
-		table   = lookup[((byte >> 4) ^ (initval >> 12)) & 0x0f];
-		initval = (initval << 4) ^ table;
-		table   = lookup[(byte ^ (initval >> 12)) & 0x0f];
-		initval = (initval << 4) ^ table;
-		}
-	return (initval & 0xffff);
 	}
 
 

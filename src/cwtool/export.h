@@ -13,9 +13,34 @@
 #ifndef CWTOOL_EXPORT_H
 #define CWTOOL_EXPORT_H
 
-extern unsigned char			*export_ushort_be(unsigned char *, int);
-extern unsigned char			*export_ushort_le(unsigned char *, int);
-extern unsigned char			*export_ulong_le(unsigned char *, unsigned long);
+#include "types.h"
+
+
+
+
+/****************************************************************************
+ *
+ * global functions
+ *
+ ****************************************************************************/
+
+
+
+
+extern cw_u8_t *
+export_u16_be(
+	cw_u8_t				*data,
+	cw_u16_t			val);
+
+extern cw_u8_t *
+export_u16_le(
+	cw_u8_t				*data,
+	cw_u16_t			val);
+
+extern cw_u8_t *
+export_u32_le(
+	cw_u8_t				*data,
+	cw_u32_t			val);
 
 
 

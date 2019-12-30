@@ -16,18 +16,30 @@
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
+#include "global.h"
+#include "options.h"
+
 
 
 
 /****************************************************************************
- * import_ushort_be
+ *
+ * global functions
+ *
  ****************************************************************************/
-int
-import_ushort_be(
-	unsigned char			*data)
+
+
+
+
+/****************************************************************************
+ * import_u16_be
+ ****************************************************************************/
+cw_u16_t
+import_u16_be(
+	cw_u8_t				*data)
 
 	{
-	int				val = data[0];
+	cw_u16_t			val = data[0];
 
 	val = (val << 8) | data[1];
 	return (val);
@@ -36,14 +48,14 @@ import_ushort_be(
 
 
 /****************************************************************************
- * import_ushort_le
+ * import_u16_le
  ****************************************************************************/
-int
-import_ushort_le(
-	unsigned char			*data)
+cw_u16_t
+import_u16_le(
+	cw_u8_t				*data)
 
 	{
-	int				val = data[1];
+	cw_u16_t			val = data[1];
 
 	val = (val << 8) | data[0];
 	return (val);
@@ -52,14 +64,14 @@ import_ushort_le(
 
 
 /****************************************************************************
- * import_ulong_le
+ * import_u32_le
  ****************************************************************************/
-unsigned long
-import_ulong_le(
-	unsigned char			*data)
+cw_u32_t
+import_u32_le(
+	cw_u8_t				*data)
 
 	{
-	unsigned long			val = data[3];
+	cw_u32_t			val = data[3];
 
 	val = (val << 8) | data[2];
 	val = (val << 8) | data[1];

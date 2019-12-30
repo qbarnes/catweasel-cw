@@ -4,35 +4,52 @@
  * string.c
  *
  ****************************************************************************
- *
- * yes i know strcmp(), strlen() and strcpy(), i only wanted to reduce
- * library dependencies ;-)
- *
- ****************************************************************************
  ****************************************************************************/
 
 
 
 
 
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+
 #include "string.h"
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
+#include "global.h"
+#include "options.h"
 
 
 
 /****************************************************************************
  * string_equal
  ****************************************************************************/
-int
+cw_bool_t
 string_equal(
-	const char			*src1,
-	const char			*src2)
+	const cw_char_t			*string1,
+	const cw_char_t			*string2)
 
 	{
-	while ((*src1 | *src2) != '\0') if (*src1++ != *src2++) return (0);
-	return (1);
+	return ((strcmp(string1, string2) == 0) ? CW_BOOL_TRUE : CW_BOOL_FALSE);
+	}
+
+
+
+/****************************************************************************
+ * string_equal2
+ ****************************************************************************/
+cw_bool_t
+string_equal2(
+	const cw_char_t			*string1,
+	const cw_char_t			*string2,
+	const cw_char_t			*string3)
+
+	{
+	if (string_equal(string1, string2)) return (CW_BOOL_TRUE);
+	if (string_equal(string1, string3)) return (CW_BOOL_TRUE);
+	return (CW_BOOL_FALSE);
 	}
 
 
@@ -40,15 +57,12 @@ string_equal(
 /****************************************************************************
  * string_length
  ****************************************************************************/
-int
+cw_count_t
 string_length(
-	const char			*src)
+	const cw_char_t			*string)
 
 	{
-	int				i = 0;
-
-	while (src[i] != '\0') i++;
-	return (i);
+	return (strlen(string));
 	}
 
 
@@ -56,21 +70,39 @@ string_length(
 /****************************************************************************
  * string_copy
  ****************************************************************************/
-char *
+cw_char_t *
 string_copy(
-	char				*dest,
-	int				size,
-	const char			*src)
+	cw_char_t			*dst,
+	cw_size_t			size,
+	const cw_char_t			*src)
 
 	{
-	char				*result = dest;
+	if (strlen(src) >= size) error_message("string_copy() size exceeded");
+	strcpy(dst, src);
+	return (dst);
+	}
 
-	do
-		{
-		if (--size < 0) error_message("string_copy() size exceeded");
-		}
-	while ((*dest++ = *src++) != '\0');
-	return (result);
+
+
+/****************************************************************************
+ * string_snprintf
+ ****************************************************************************/
+cw_count_t
+string_snprintf(
+	cw_char_t			*string,
+	cw_size_t			size,
+	const cw_char_t			*format,
+	...)
+
+	{
+	va_list				args;
+	cw_count_t			len;
+
+	va_start(args, format);
+	len = vsnprintf(string, size, format, args);
+	va_end(args);
+	if ((len == -1) || (len >= size)) error_message("string_snprintf() size exceeded");
+	return (len);
 	}
 
 
@@ -78,22 +110,22 @@ string_copy(
 /****************************************************************************
  * string_dot
  ****************************************************************************/
-char *
+cw_char_t *
 string_dot(
-	char				*dest,
-	int				size,
-	char				*src)
+	cw_char_t			*dst,
+	cw_size_t			size,
+	cw_char_t			*src)
 
 	{
-	int				i;
+	cw_index_t			i;
 
-	debug_error_condition(size < 4);
-	if (string_length(src) < size) return (src);
-	for (i = 0; i < size - 4; i++) dest[i] = src[i];
-	dest[size - 4] = '.';
-	dest[size - 3] = '.';
-	dest[size - 2] = '.';
-	dest[size - 1] = '\0';
-	return (dest);
+	if (size < 4) error_message("string_dot: size < 4");
+	if (strlen(src) < size) return (src);
+	for (i = 0; i < size - 4; i++) dst[i] = src[i];
+	dst[size - 4] = '.';
+	dst[size - 3] = '.';
+	dst[size - 2] = '.';
+	dst[size - 1] = '\0';
+	return (dst);
 	}
 /******************************************************** Karsten Scheibler */

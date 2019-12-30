@@ -12,78 +12,103 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "error.h"
-#include "debug.h"
+#include "global.h"
 
-
-
-extern char				program_name[];
 
 
 
 /****************************************************************************
- * _error_head
+ *
+ * global functions
+ *
  ****************************************************************************/
-void
-_error_head(
-	char				*file,
-	int				line)
 
-	{
-	if (debug_level > 0) fprintf(stderr, "%s:%s:%d: ", program_name, file, line);
-	else fprintf(stderr, "%s: ", program_name);
-	}
 
 
 
 /****************************************************************************
- * _error_perror
+ * error_exit
  ****************************************************************************/
-void
-_error_perror(
-	char				*file,
-	int				line)
+cw_void_t
+error_exit(
+	cw_void_t)
 
 	{
-	_error_head(file, line);
-	fprintf(stderr, "%s\n", strerror(errno));
 	exit(1);
 	}
 
 
 
 /****************************************************************************
- * _error_oom
+ * error_message2
  ****************************************************************************/
-void
-_error_oom(
-	char				*file,
-	int				line)
+cw_void_t
+error_message2(
+	cw_flag_t			flags,
+	const cw_char_t			*prepend,
+	const cw_char_t			*append,
+	const cw_char_t			*format,
+	...)
 
 	{
-	_error_head(file, line);
-	fprintf(stderr, "could not allocate memory\n");
-	exit(1);
+	va_list				args;
+	const cw_char_t			empty[] = "";
+
+	va_start(args, format);
+	if (prepend == NULL) prepend = empty;
+	if (append == NULL) append = empty;
+	if (format != NULL)
+		{
+		fprintf(stderr, "%s: %s", global_program_name(), prepend);
+		vfprintf(stderr, format, args);
+		fprintf(stderr, "%s\n", append);
+		}
+	va_end(args);
+	if (flags & ERROR_FLAG_PERROR) fprintf(stderr, "%s: %s\n", global_program_name(), strerror(errno));
+	if (flags & ERROR_FLAG_EXIT) error_exit();
 	}
 
 
 
 /****************************************************************************
- * _error_message
+ * error_oom
  ****************************************************************************/
-void
-_error_message(
-	char				*file,
-	int				line,
-	char				*msg)
+cw_void_t
+error_oom(
+	cw_void_t)
 
 	{
-	_error_head(file, line);
-	if (msg == NULL) fprintf(stderr, "internal error\n");
-	else fprintf(stderr, "%s\n", msg);
-	exit(1);
+	error_message2(ERROR_FLAG_EXIT, NULL, NULL, "could not allocate memory");
+	}
+
+
+
+/****************************************************************************
+ * error_internal
+ ****************************************************************************/
+cw_void_t
+error_internal(
+	cw_void_t)
+
+	{
+	error_message2(ERROR_FLAG_EXIT, NULL, NULL, "internal error");
+	}
+
+
+
+/****************************************************************************
+ * error_perror
+ ****************************************************************************/
+cw_void_t
+error_perror(
+	cw_void_t)
+
+	{
+	error_message2(ERROR_FLAG_EXIT | ERROR_FLAG_PERROR, NULL, NULL, NULL);
 	}
 /******************************************************** Karsten Scheibler */
