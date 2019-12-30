@@ -12,6 +12,7 @@ else
 KERNEL_DIR=/lib/modules/${shell uname -r}/build
 VERSION=${shell uname -r | awk 'BEGIN { FS="."; }{ print($$1 $$2); }'}
 INCLUDE=-I${KERNEL_DIR}/include -I../include
+BASH=bash
 MAKE=make
 CWD=${shell pwd}
 CC=gcc -Wall -O2 -D__KERNEL__ -DMODULE ${DEBUG} ${INCLUDE}
@@ -25,14 +26,17 @@ LN=ln -f
 all:
 	if [ "${VERSION}" = "26" ]; then ${MAKE} linux26; else ${MAKE} linux24; fi
 
-linux24: cwfirmware.c ${TARGET24}
+linux24: config.h cwfirmware.c ${TARGET24}
 
-linux26: cwfirmware.c cwmain.c
+linux26: config.h cwfirmware.c cwmain.c
 	CW_DIR=${CWD} ${MAKE} -C ${KERNEL_DIR} M=${CWD} modules && ${CP} cw.ko ${TARGET26}
 
 # Linux 2.6 will create a cw.o containing all *.o files this will conflict
 # with the object file generated from cw.c, so cw.c is simply linked to
 # cwmain.c before compiling
+
+config.h:
+	${BASH} ../../tools/config.bash > config.h
 
 cwfirmware.c: cwfirmware.bin
 	gcc -s -Wall -O2 -o fwdump ../../tools/fwdump.c
@@ -50,5 +54,5 @@ ${TARGET24}: ${OBJECTS}
 
 clean:
 	if [ "${VERSION}" = "26" ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
-	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} cwmain.c cwfirmware.c *~ *.bak *.ko Module.symvers
+	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} cwmain.c config.h cwfirmware.c *~ *.bak *.ko Module.symvers Modules.symvers
 endif

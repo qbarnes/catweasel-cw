@@ -1,3 +1,14 @@
+cw 0.12.3-20080211
+	* changed configuration mac_5.25. writing such images should now be
+	  possible (thanks to Matt Carpenter for supplying raw images and
+	  testing written images with a real Apple IIc)
+	* added configuration mac_5.25_300 for Apple IIe 5.25" disks. this
+	  format is an interims solution to support drives with 300 rpm.
+	  but do not rely on the existence of these formats in future
+	  versions, the handling of drives with different rpm's may change
+	  again
+	* compile time fixes for Linux 2.6.19+
+
 cw 0.12.2-20070324
 	* corrected track ranges in configurations for ibm_dsdd and dg_dsdd
 	* lowered needed sync_length for various c1541 configurations
@@ -5,7 +16,7 @@ cw 0.12.2-20070324
 	  Linux 2.4
 
 cw 0.12.1-20070319
-	* slightly changed configuration for mac_dd_800 and mac_dd_800_524
+	* slightly changed configuration mac_dd_800 and mac_dd_800_524
 	* enabled post compensation in all disk configurations. this should
 	  improve readability of disks but will also slow down disk reading
 	  especially on older computers with CPUs below 1 GHz

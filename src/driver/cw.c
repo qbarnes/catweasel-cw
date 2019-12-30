@@ -11,7 +11,7 @@
 
 
 #ifdef MODULE
-#include <linux/config.h>
+#include "config.h"	/* includes <linux/config.h> if needed */
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/module.h>

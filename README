@@ -25,12 +25,12 @@ work as expected.
 
 
 To build cw a simple 'make' should be enough. Remember that you need the
-header files from your running kernel in order to compile the driver module.
-cw was tested on x86 under different distributions with different Linux kernel
+source of your running kernel in order to compile the driver module. cw was
+tested on x86 under different distributions with different Linux kernel
 versions (to name a few: 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 all directly
-taken from http://www.kernel.org/), it was also succesfully compiled on
-Knoppix 4.0.2, SuSE 10.0, 10.1 and 10.2. There were also reports, that cw
-runs on PowerPC platforms under Linux without problems.
+taken from http://www.kernel.org/), it also succesfully compiled on
+Knoppix 4.0.2, SuSE 10.0, 10.1, 10.2 and 10.3. There were also reports,
+that cw runs on PowerPC platforms under Linux without problems.
 
 You may build cwtool with dietlibc, just set and export the environment
 variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
@@ -169,7 +169,7 @@ NOTE: older 360K drives seem to read data independently of the index pulse
 Assume your 360K drive is on /dev/cw0raw0, then try the following (yes the
 line break is ok, but you may also write it in one line):
 
-# cwtool -I -e 'drive "/dev/cw0raw0" { invert_diskchange yes
+# cwtool -I -e 'drive "/dev/cw0raw0" { inverted_diskchange yes
       double_step yes }'
 
 Those drives seem to give an inverted diskchange-signal and work with 300
@@ -183,9 +183,11 @@ break is ok, but you may also write it in one line):
 
 This instructs the driver to not check if an index pulse is present or not.
 But this also means that the driver will not return an error if no disk is in
-the drive. You should now be able to read a C1541 disk:
+the drive. You should now be able to read a C1541 disk or a Apple IIe disk:
 
 # cwtool -R -v c1541_300 /dev/cw0raw0 image.d64
+
+# cwtool -R -v mac_5.25_300 /dev/cw0raw0 image.bin
 
 As mentioned above 360K drives operate with 300 rpm instead of 360 rpm like
 the 1.2M ones, so you need to use different disk configurations.

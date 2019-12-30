@@ -1335,8 +1335,14 @@ disk "atari_hd"
 disk "mac_5.25"
 	{
 	info "Apple, GCR, 5.25 inch, 35 trks, 1 side, 16 sec/trk, 140 K"
-	format "gcr_apple"
 	clock 14
+	track_range 2 134 4
+		{
+		format "fill"
+		optional yes
+		write fill_length 16384
+		}
+	format "gcr_apple"
 	sectors 16
 	read
 		{
@@ -1352,12 +1358,52 @@ disk "mac_5.25"
 			-0x0100 +0x0000 +0x0000
 			-0x0100 +0x0000 +0x0000
 			}
+		fill_length1 23
+		fill_length2 7
 		}
 	bounds
 		{
 		0x0800 0x1600 0x2200
-		0x2300 0x2c00 0x3800
-		0x3900 0x4300 0x5000
+		0x2300 0x2d00 0x3900
+		0x3a00 0x4300 0x5000
+		}
+	track_range 0 136 4 { }
+	}
+
+disk "mac_5.25_300"
+	{
+	info "Apple, same as mac_5.25 but for 300 RPM drives"
+	clock 14
+	track_range 2 134 4
+		{
+		format "fill"
+		optional yes
+		write fill_length 16384
+		}
+	format "gcr_apple"
+	sectors 16
+	read
+		{
+		timeout 240
+		postcomp yes
+		}
+	write
+		{
+		timeout 400
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length1 23
+		fill_length2 7
+		}
+	bounds
+		{
+		0x0800 0x1b00 0x2900
+		0x2a00 0x3600 0x4400
+		0x4500 0x5200 0x6000
 		}
 	track_range 0 136 4 { }
 	}

@@ -656,7 +656,7 @@ raw_histogram(
 	unsigned char			*data = fifo_get_data(ffo);
 	int				size = fifo_get_wr_ofs(ffo);
 
-	if (verbose_level >= -1) return (raw_histogram_long(data, size, track, xlated_track));
+	if (verbose_level >= -2) return (raw_histogram_long(data, size, track, xlated_track));
 	return (raw_histogram_short(data, size, track, xlated_track));
 	}
 
@@ -676,7 +676,7 @@ raw_postcomp_histogram(
 	{
 	int				p;
 
-	if (verbose_level >= 1)
+	if (verbose_level >= 0)
 		{
 		p = raw_postcomp(ffo, bnd, bnd_size);
 		printf("postcompensated %d values\n", p);
@@ -704,7 +704,7 @@ raw_precomp_statistics(
 	int				sum1[8][8] = { }, sum2[8][8] = { }, count[8][8] = { };
 	int				sum = 0, bits1 = 0, bits2 = 0;
 
-	if (verbose_level < 0) return (0);
+	if (verbose_level < -1) return (0);
 
 	/* create lookup table */
 

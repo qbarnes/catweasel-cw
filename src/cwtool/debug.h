@@ -18,6 +18,8 @@
 #include "error.h"
 
 #ifdef CWTOOL_DEBUG
+#define debug_compiled_in		1
+
 #define debug(level, msg...)					\
 	do							\
 		{						\
@@ -45,10 +47,11 @@
 		}						\
 	while (0)
 #else /* CWTOOL_DEBUG */
-#define debug(level, msg...)
-#define debug_head()
-#define debug_error()
-#define debug_error_condition(cond)
+#define debug_compiled_in		0
+#define debug(level, msg...)		while (0)
+#define debug_head()			while (0)
+#define debug_error()			while (0)
+#define debug_error_condition(cond)	while (0)
 #endif /* CWTOOL_DEBUG */
 
 extern int				debug_level;

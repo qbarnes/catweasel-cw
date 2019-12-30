@@ -640,7 +640,7 @@ cmdline_parse(
 			}
 		else if (((string_equal(arg, "-S")) || (string_equal(arg, "--statistics"))) && (args == 0))
 			{
-			verbose_level = -2;
+			verbose_level = -3;
 			mode = CWTOOL_MODE_STATISTICS;
 			}
 		else if (((string_equal(arg, "-R")) || (string_equal(arg, "--read"))) && (args == 0))

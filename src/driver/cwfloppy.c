@@ -10,7 +10,7 @@
 
 
 
-#include <linux/config.h>
+#include "config.h"	/* includes <linux/config.h> if needed */
 #include <asm/uaccess.h>
 #include <linux/delay.h>
 #include <linux/fs.h>

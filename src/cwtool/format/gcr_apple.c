@@ -529,6 +529,20 @@ gcr_apple_header_checksum(
 
 
 /****************************************************************************
+ * gcr_apple_track_number_5inch
+ ****************************************************************************/
+static int
+gcr_apple_track_number_5inch(
+	struct gcr_apple		*gcr_apl,
+	int				track)
+
+	{
+	return (track / gcr_apl->rw.track_step);
+	}
+
+
+
+/****************************************************************************
  * gcr_apple_read_sector2
  ****************************************************************************/
 static int
@@ -619,7 +633,7 @@ gcr_apple_read_sector(
 		t      = header[1];
 		sector = header[2];
 		c      = header[3];
-		track  = track / 4;
+		track  = gcr_apple_track_number_5inch(gcr_apl, track);
 		}
 	else
 		{
@@ -689,7 +703,7 @@ gcr_apple_write_sector(
 	if (gcr_apl->rw.mode == 0)
 		{
 		header[0] = gcr_apl->rw.volume_id;
-		header[1] = track / 4;
+		header[1] = gcr_apple_track_number_5inch(gcr_apl, track);
 		header[2] = sector;
 		header[3] = gcr_apple_header_checksum(gcr_apl, header);
 		disk_sector_write(data, dsk_sct);
@@ -812,7 +826,8 @@ gcr_apple_write_track(
 #define MAGIC_MODE			14
 #define MAGIC_SYNC_VALUE1		15
 #define MAGIC_SYNC_VALUE2		16
-#define MAGIC_BOUNDS			17
+#define MAGIC_TRACK_STEP		17
+#define MAGIC_BOUNDS			18
 
 
 
@@ -845,6 +860,7 @@ gcr_apple_set_defaults(
 			.sectors       = 16,
 			.volume_id     = 0xfe,
 			.mode          = 0,
+			.track_step    = 4,
 			.sync_value1   = 0xd5aa96,
 			.sync_value2   = 0xd5aaad,
 			.bnd           =
@@ -924,6 +940,7 @@ gcr_apple_set_rw_option(
 	if (magic == MAGIC_MODE)        return (setvalue_uchar(&fmt->gcr_apl.rw.mode, val, 0, 0xff));
 	if (magic == MAGIC_SYNC_VALUE1) return (setvalue_uint(&fmt->gcr_apl.rw.sync_value1, val, 0, 0xffffff));
 	if (magic == MAGIC_SYNC_VALUE2) return (setvalue_uint(&fmt->gcr_apl.rw.sync_value2, val, 0, 0xffffff));
+	if (magic == MAGIC_TRACK_STEP)  return (setvalue_uchar(&fmt->gcr_apl.rw.track_step, val, 1, 4));
 	debug_error_condition(magic != MAGIC_BOUNDS);
 	return (setvalue_bounds(fmt->gcr_apl.rw.bnd, val, ofs));
 	}
@@ -1015,6 +1032,7 @@ static struct format_option		gcr_apple_rw_options[] =
 	FORMAT_OPTION_INTEGER("mode",        MAGIC_MODE,        1),
 	FORMAT_OPTION_INTEGER("sync_value1", MAGIC_SYNC_VALUE1, 1),
 	FORMAT_OPTION_INTEGER("sync_value2", MAGIC_SYNC_VALUE2, 1),
+	FORMAT_OPTION_INTEGER("track_step",  MAGIC_TRACK_STEP,  1),
 	FORMAT_OPTION_INTEGER("bounds",      MAGIC_BOUNDS,      9),
 	FORMAT_OPTION_END
 	};

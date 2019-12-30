@@ -13,7 +13,7 @@
 #ifndef CWHARDWARE_H
 #define CWHARDWARE_H
 
-#include <linux/config.h>
+#include "config.h"	/* includes <linux/config.h> if needed */
 #include <linux/pci.h>
 
 struct cw_hardware;

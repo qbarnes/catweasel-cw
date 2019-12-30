@@ -37,7 +37,7 @@ struct gcr_apple
 		unsigned char		sectors;
 		unsigned char		volume_id;
 		unsigned char		mode;
-		unsigned char		reserved;
+		unsigned char		track_step;
 		unsigned int		sync_value1;
 		unsigned int		sync_value2;
 		struct bounds		bnd[3];

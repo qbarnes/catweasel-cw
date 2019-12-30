@@ -249,7 +249,7 @@ gcr_cbm_track_number(
 	int				track)
 
 	{
-	return (track / gcr_cbm->rw.track_step + 1);
+	return ((track / gcr_cbm->rw.track_step) + 1);
 	}
 
 
