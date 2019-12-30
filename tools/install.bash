@@ -11,6 +11,17 @@
 
 
 #############################################################################
+# error
+#############################################################################
+error()
+	{
+	echo "$(basename "$0"): $@" 1>&2
+	exit 1
+	}
+
+
+
+#############################################################################
 # copy_file
 #############################################################################
 copy_file()
@@ -30,10 +41,7 @@ copy_file()
 upgrade_file()
 	{
 	[ -e "$1" ] || return
-	if [ ! -e "$2" ]; then
-		echo "file '$2' not found, no upgrade possible" 1>&2
-		exit 1
-	fi
+	[ -e "$2" ] || error "file '$2' not found, no upgrade possible"
 	echo "upgrading '$1' -> '$2'" &&
 	chown root:root "$1" &&
 	cp -a "$1" "$2" || exit 1
@@ -62,9 +70,12 @@ write_uninstall_info()
 	MAJOR="$MAJOR"
 	BIN_DIR="$BIN_DIR"
 	MAN_DIR="$MAN_DIR"
+	MK1_PORTS="$MK1_PORTS"
+	MK2_PORTS="$MK2_PORTS"
 	MODULE_DIR="$MODULE_DIR"
 	MODULE_NAME="$MODULE_NAME"
 	MODULES_CONF="$MODULES_CONF"
+	MODPROBE_D="$MODPROBE_D"
 	UDEV_STATIC_DEVICES="$UDEV_STATIC_DEVICES"
 	EOC
 	}
@@ -100,6 +111,23 @@ check_char_major()
 
 
 #############################################################################
+# check_modules
+#############################################################################
+check_modules()
+	{
+	if [ "$(lsmod | sed '1d' | grep '^netjet ')" ]; then
+		cat <<-EOM 1>&2
+		The netjet ISDN kernel module is loaded. This may cause problems, because
+		this module looks for the same PCI-IDs as the cw kernel driver. Unload this
+		module first.
+		EOM
+		exit 1
+	fi
+	}
+
+
+
+#############################################################################
 # modify_modules_conf
 #############################################################################
 modify_modules_conf()
@@ -112,7 +140,7 @@ modify_modules_conf()
 		line++;
 		}
 
-	/^options '"$MODULE_NAME"' cw_major='"$MAJOR"'$/ ||
+	/^options '"$MODULE_NAME"' cw_major='"$MAJOR"' cw_mk1_ports='"$MK1_PORTS"' cw_mk2_ports='"$MK2_PORTS"'$/ ||
 	/^alias char-major-'"$MAJOR $MODULE_NAME"'$/ {
 		printf("%8d %s\n", line, $0);
 		next;
@@ -139,7 +167,7 @@ modify_modules_conf()
 		echo "adding entries to '$MODULES_CONF'"
 		{
 		echo "alias char-major-$MAJOR $MODULE_NAME"
-		echo "options $MODULE_NAME cw_major=$MAJOR"
+		echo "options $MODULE_NAME cw_major=$MAJOR cw_mk1_ports=$MK1_PORTS cw_mk2_ports=$MK2_PORTS"
 		} >> "$MODULES_CONF"
 	fi
 	}
@@ -156,7 +184,7 @@ cleanup_modules_conf()
 		return
 	fi
 	echo "cleaning up '$MODULES_CONF'"
-	awk '! /^alias char-major-'"$MAJOR $MODULE_NAME"'$/ && ! /^options '"$MODULE_NAME"' cw_major='"$MAJOR"'$/'  \
+	awk '! /^alias char-major-'"$MAJOR $MODULE_NAME"'$/ && ! /^options '"$MODULE_NAME"' cw_major='"$MAJOR"' cw_mk1_ports='"$MK1_PORTS"' cw_mk2_ports='"$MK2_PORTS"'$/'  \
 		"$MODULES_CONF" > "$MODULES_CONF.tmp" &&
 	cat "$MODULES_CONF.tmp" > "$MODULES_CONF" &&
 	rm -f "$MODULES_CONF.tmp" || exit 1
@@ -169,24 +197,23 @@ cleanup_modules_conf()
 #############################################################################
 modify_modprobe_d()
 	{
-	if [ ! -d "$MODULES_CONF" ]; then
-		echo "directory '$MODULES_CONF' not found" 1>&2
+	if [ ! -d "$MODPROBE_D" ]; then
+		echo "directory '$MODPROBE_D' not found" 1>&2
 		return
 	fi
-	if [ -e "$MODULES_CONF/catweasel" ]; then
-		echo "renaming '$MODULES_CONF/catweasel' to '$MODULES_CONF/catweasel.conf'"
-		mv "$MODULES_CONF/catweasel" "$MODULES_CONF/catweasel.conf"
+	if [ -e "$MODPROBE_D/$CATWEASEL_CONF_OLD" ]; then
+		echo "renaming '$MODPROBE_D/$CATWEASEL_CONF_OLD' to '$MODPROBE_D/$CATWEASEL_CONF'"
+		mv "$MODPROBE_D/$CATWEASEL_CONF_OLD" "$MODPROBE_D/$CATWEASEL_CONF"
 	fi
-	if [ -e "$MODULES_CONF/catweasel.conf" ]; then
-		echo "file '$MODULES_CONF/catweasel.conf' already exists" 1>&2
-		exit 1
+	if [ -e "$MODPROBE_D/$CATWEASEL_CONF" ]; then
+		error "file '$MODPROBE_D/$CATWEASEL_CONF' already exists"
 	fi
-	echo "adding entries to '$MODULES_CONF/catweasel.conf'"
+	echo "adding entries to '$MODPROBE_D/$CATWEASEL_CONF'"
 	{
 	echo "# used by the driver for cwtool"
 	echo "alias char-major-$MAJOR $MODULE_NAME"
 	echo "options $MODULE_NAME cw_major=$MAJOR"
-	} > "$MODULES_CONF/catweasel.conf"
+	} > "$MODPROBE_D/$CATWEASEL_CONF"
 	}
 
 
@@ -196,11 +223,11 @@ modify_modprobe_d()
 #############################################################################
 cleanup_modprobe_d()
 	{
-	if [ ! -d "$MODULES_CONF" ]; then
-		echo "directory '$MODULES_CONF' not found"
+	if [ ! -d "$MODPROBE_D" ]; then
+		echo "directory '$MODPROBE_D' not found"
 		return
 	fi
-	rm -f "$MODULES_CONF/catweasel.conf"
+	rm -f "$MODPROBE_D/$CATWEASEL_CONF"
 	}
 
 
@@ -210,7 +237,7 @@ cleanup_modprobe_d()
 #############################################################################
 modify_module_autoload()
 	{
-	if [ -d "$MODULES_CONF" ]; then
+	if [ -d "$MODPROBE_D" ]; then
 		modify_modprobe_d
 	else
 		modify_modules_conf
@@ -226,7 +253,7 @@ modify_module_autoload()
 #############################################################################
 cleanup_module_autoload()
 	{
-	if [ -d "$MODULES_CONF" ]; then
+	if [ -d "$MODPROBE_D" ]; then
 		cleanup_modprobe_d
 	else
 		cleanup_modules_conf
@@ -356,25 +383,41 @@ cleanup_static_devices()
 #############################################################################
 # main
 #############################################################################
+[ $(id -u) -eq 0 ] || error "you have to be root"
+
+# default settings
+
+VERSION="$(uname -r | awk 'BEGIN { FS="."; } { print($1 $2); }')"
 [ "$MAJOR" ]               || MAJOR="120"
 [ "$BIN_DIR" ]             || BIN_DIR="/usr/bin"
 [ "$MAN_DIR" ]             || MAN_DIR="/usr/share/man"
+[ "$MK1_PORTS" ]           || MK1_PORTS="0"
+[ "$MK2_PORTS" ]           || MK2_PORTS="0"
 [ "$MODULE_DIR" ]          || MODULE_DIR="/lib/modules/$(uname -r)/kernel/drivers/char"
 [ "$MODULE_NAME" ]         || MODULE_NAME="cw"
 [ "$UDEV_STATIC_DEVICES" ] || UDEV_STATIC_DEVICES="/etc/udev/static_devices.txt"
-if [ -z "$MODULES_CONF" ]; then
-	VERSION="$(uname -r | awk 'BEGIN { FS="."; } { print($1 $2); }')"
-	MODULES_CONF="/etc/modules.conf"
-	if [ "$VERSION" -ge "26" ]; then
+if [ "$VERSION" -ge "26" ]; then
+	if [ "$MODULES_CONF" ] || [ "$MODPROBE_D" ]; then
+		true
+	elif [ -d "/etc/modprobe.d" ]; then
+		MODPROBE_D="/etc/modprobe.d"
+	else
 		MODULES_CONF="/etc/modprobe.conf"
-		[ -e "$MODULES_CONF" ] || MODULES_CONF="/etc/modprobe.d"
 	fi
+elif [ -z "$MODULES_CONF" ]; then
+	MODULES_CONF="/etc/modules.conf"
+	MODPROBE_D=""
 fi
 MAN_DIR="$MAN_DIR/man1"
+CATWEASEL_CONF_OLD="catweasel"
+CATWEASEL_CONF="catweasel.conf"
+
+# depending on program name do different things
 
 PROGRAM_NAME="$(basename $0)"
 if [ "$PROGRAM_NAME" = "install.bash" ]; then
 	check_char_major
+	check_modules
 	write_uninstall_info
 	copy_file "bin/cwtool" "$BIN_DIR/cwtool"
 	copy_file "module/cw.o" "$MODULE_DIR/$MODULE_NAME.o"

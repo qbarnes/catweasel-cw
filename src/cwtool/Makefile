@@ -1,12 +1,20 @@
 PREFIX:=../..
 include ${PREFIX}/Makefile.conf
 
-# uncomment this to build cwtool with debugging messages. To increase debug
-# level use the command line option -d
-#DEBUG=-DCWTOOL_DEBUG
+# use make DEBUG=1 to build cwtool with debugging messages
+# (to increase debug level use the command line option -d)
+# use make STANDALONE=1 to build cwtool standalone on non-linux platforms
 
-CC:=${DIET} gcc -s -Wall -O2 -I${BUILD_INCLUDE_DIR} ${DEBUG}
+CC:=${DIET} gcc -s -Wall -O2 -I${BUILD_INCLUDE_DIR}
 STRIP:=strip -R .note -R .comment
+
+ifdef DEBUG
+CC+=-DCWTOOL_DEBUG
+endif
+
+ifdef STANDALONE
+CC+=-DCW_STANDALONE
+endif
 
 CONFIG:=${BUILD_CONF_DIR}/cwtoolrc.default
 FILES:=cwtool error debug verbose global cmdline options trackmap disk  \
@@ -37,7 +45,7 @@ config.o: cwtoolrc.c
 
 ${TARGET}: ${OBJECTS}
 	${CC} -o ${TARGET} ${OBJECTS}
-	${STRIP} ${TARGET}
+	${STRIP} ${TARGET} || true
 
 clean:
 	${RM} ${TARGET} ${OBJECTS} cwtoolrc.c *~ *.bak

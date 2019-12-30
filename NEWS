@@ -1,3 +1,16 @@
+cw 0.13-20121202
+	* kernel driver: added support for the MK2 Anniversary Edition taken
+	  from https://github.com/ezrec/cw/ (thanks to Jason McMullan).
+	  This support requires a modified 40-pin IDE cable with pins 37
+	  and 38 (IDE_CS0 and IDE_CS1) swapped and you need to use the
+	  MK2_PORTS parameter when executing 'make install'. In addition,
+	  make sure that other drivers do not use these ports 
+	* added configuration mac_ssdd_400 and mac_ssdd_400_524 for Mac400
+	  disks. while mac_ssdd_400_524 writes out all 524 bytes of a
+	  sector, mac_ssdd_400 gives back 512 bytes per sector
+	* added compile time fixes to build cwtool standalone on non-linux
+	  platforms (thanks to balrog). This is experimental
+
 cw 0.13-20120623
 	* kernel driver: compile time fixes for Linux 3.0+ (thanks to
 	  Dennis Boone)

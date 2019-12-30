@@ -35,6 +35,7 @@
 
 
 
+#define CW_NAME_MK2			CW_NAME "_mk2"
 #define CW_NAME_MK3			CW_NAME "_mk3"
 #define CW_NAME_MK4			CW_NAME "_mk4"
 
@@ -101,7 +102,9 @@ cw_hardware_floppy_bit(
 		if (bit == CW_BITR_HOSTSELECT0)  return (1);
 		if (bit == CW_BITR_HOSTSELECT1)  return (0);
 		}
-	if ((hrd->model == CW_HARDWARE_MODEL_MK3) || (hrd->model == CW_HARDWARE_MODEL_MK4))
+	if ((hrd->model == CW_HARDWARE_MODEL_MK2) ||
+		(hrd->model == CW_HARDWARE_MODEL_MK3) ||
+		(hrd->model == CW_HARDWARE_MODEL_MK4))
 		{
 		if (bit == CW_BITW_DENSITY)      return (0);
 		if (bit == CW_BITW_MOTOR0)       return (1);
@@ -140,14 +143,17 @@ cw_hardware_floppy_register(
 	int				reg)
 
 	{
-	if (hrd->model == CW_HARDWARE_MODEL_MK4)
+	if (hrd->model == CW_HARDWARE_MODEL_MK2)
 		{
-		if (reg == CW_REG_DATADIR)     return (hrd->iobase + 0x02);
-		if (reg == CW_REG_SELECTBANK)  return (hrd->iobase + 0x03);
-		if (reg == CW_REG_INDIR)       return (hrd->iobase + 0x07);
-		if (reg == CW_REG_CATCONTROL2) return (hrd->iobase + 0xf8);
+		if (reg == CW_REG_CATMEM)      return (hrd->iobase + 0x0);
+		if (reg == CW_REG_CATABORT)    return (hrd->iobase + 0x1);
+		if (reg == CW_REG_CATCONTROL)  return (hrd->iobase + 0x2);
+		if (reg == CW_REG_CATOPTION)   return (hrd->iobase + 0x3);
+		if (reg == CW_REG_CATSTARTA)   return (hrd->iobase + 0x4);
+		if (reg == CW_REG_CATSTARTB)   return (hrd->iobase + 0x5);
 		}
-	if ((hrd->model == CW_HARDWARE_MODEL_MK3) || (hrd->model == CW_HARDWARE_MODEL_MK4))
+	if ((hrd->model == CW_HARDWARE_MODEL_MK3) ||
+		(hrd->model == CW_HARDWARE_MODEL_MK4))
 		{
 		if (reg == CW_REG_JOYDAT)      return (hrd->iobase + 0xc0);
 		if (reg == CW_REG_CATMEM)      return (hrd->iobase + 0xe0);
@@ -157,11 +163,75 @@ cw_hardware_floppy_register(
 		if (reg == CW_REG_CATSTARTA)   return (hrd->iobase + 0xf0);
 		if (reg == CW_REG_CATSTARTB)   return (hrd->iobase + 0xf4);
 		}
+	if (hrd->model == CW_HARDWARE_MODEL_MK4)
+		{
+		if (reg == CW_REG_DATADIR)     return (hrd->iobase + 0x02);
+		if (reg == CW_REG_SELECTBANK)  return (hrd->iobase + 0x03);
+		if (reg == CW_REG_INDIR)       return (hrd->iobase + 0x07);
+		if (reg == CW_REG_CATCONTROL2) return (hrd->iobase + 0xf8);
+		}
 
 	/* should never be reached */
 
 	cw_debug(1, "unknown register requested");
 	return (hrd->iobase + 0xff);
+	}
+
+
+
+/****************************************************************************
+ * cw_hardware_mk2_remove
+ ****************************************************************************/
+static void
+cw_hardware_mk2_remove(
+	struct cw_hardware		*hrd)
+
+	{
+	if (hrd == NULL) return;
+	if (hrd->model != CW_HARDWARE_MODEL_MK2) return;
+	release_region(hrd->iobase, 6);
+	cw_driver_unregister_hardware(hrd);
+	}
+
+
+
+/****************************************************************************
+ * cw_hardware_mk2_probe
+ ****************************************************************************/
+static int
+cw_hardware_mk2_probe(
+	int				iobase)
+
+	{
+	const char			*name = CW_NAME_MK2;
+	struct cw_hardware		*hrd;
+
+	/* get next available controller struct */
+
+	hrd = cw_driver_get_hardware(-1);
+	if (hrd == NULL)
+		{
+		cw_error("number of %d supported controllers exceeded", CW_NR_CONTROLLERS);
+		return (-ENODEV);
+		}
+
+	/* allocate io region */
+
+	if (request_region(iobase, 6, name) == NULL)
+		{
+		cw_error("[c%d] io ports 0x%04x-0x%04x already in use", hrd->cnt->num, iobase, iobase + 5);
+		return (-EBUSY);
+		}
+
+	hrd->model = CW_HARDWARE_MODEL_MK2;
+	hrd->iobase = iobase;
+	hrd->control_register = 255;
+	cw_notice("[c%d] registering %s at 0x%04x", hrd->cnt->num, name, iobase);
+
+	/* all went fine controller is ready */
+
+	cw_driver_register_hardware(hrd);
+	return (0);
 	}
 
 
@@ -654,6 +724,46 @@ cw_hardware_wpulse_length(
 		i = wpulse_length / CW_WPULSE_LENGTH_MULTIPLIER;
 		}
 	return (i);
+	}
+
+
+
+/****************************************************************************
+ * cw_hardware_mk2_register
+ ****************************************************************************/
+int
+cw_hardware_mk2_register(
+	const int			*iobases)
+
+	{
+	int				i;
+	int				result;
+
+	for (i = 0; iobases[i] != 0; i++)
+		{
+		result = cw_hardware_mk2_probe(iobases[i]);
+		if (result != 0) return (result);
+		}
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * cw_hardware_mk2_unregister
+ ****************************************************************************/
+void
+cw_hardware_mk2_unregister(
+	void)
+
+	{
+	struct cw_hardware		*hrd;
+	cw_index_t			c;
+
+	for (c = 0; (hrd = cw_driver_get_hardware(c)) != NULL; c++)
+		{
+		cw_hardware_mk2_remove(hrd);
+		}
 	}
 
 

@@ -22,7 +22,13 @@
 #include <stdlib.h>
 #endif /* !__KERNEL__ */
 
+#ifdef __linux__
 #include <linux/ioctl.h>
+#endif /* __linux__ */
+
+#ifdef __APPLE__
+#include <sys/ioccom.h>
+#endif
 
 #include "types.h"
 

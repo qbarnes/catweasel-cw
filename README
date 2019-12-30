@@ -10,13 +10,18 @@ eMail:    cw@unusedino.de
 
 cw is (yet another) package for the Catweasel controller, look under [5] for
 other existing packages. This package is especially for accessing the floppy
-drives connected to Catweasel. Currently the MK3, MK4 and MK4+ controller
-cards are supported. cw consists of a kernel driver and a companion user
-space program (cwtool). The kernel driver should work with Linux 2.4 and 2.6.
-Look at the homepage of the manufacturer http://www.jschoenfeld.com/ for more
-details about the controller features. Please read also the man page for
-some hardware oddities you should know about, before complaining that
-something does not work as expected.
+drives connected to Catweasel. Currently the following cards are supported:
+  * MK2 (connected to an IDE controller)
+  * MK3 (PCI card)
+  * MK4 (PCI card)
+  * MK4plus (PCI card)
+
+cw consists of a kernel driver and a companion user space program (cwtool).
+The kernel driver should work with Linux 2.4.x, 2.6.x and 3.x. Look at the
+homepage of the manufacturer http://www.jschoenfeld.com/ for more details
+about the controller features. Please read also the man page for some
+hardware oddities you should know about, before complaining that something
+does not work as expected.
 
 
   ============================
@@ -29,8 +34,9 @@ source of your running kernel in order to compile the driver module. cw was
 tested on x86 under different distributions with different Linux kernel
 versions (to name a few: 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 all directly
 taken from http://www.kernel.org/), it also succesfully compiled on
-Knoppix 4.0.2, SuSE 10.0, 10.1, 10.2, 10.3 and 11.1. There were also
-reports, that cw runs on PowerPC platforms under Linux without problems.
+Knoppix 4.0.2, SuSE 10.0 - 10.3, 11.1, 11.2, Ubuntu 10.10 (x64) and
+Debian 6.0. There were also reports, that cw runs on PowerPC platforms
+under Linux without problems.
 
 You may build cwtool with dietlibc, just set and export the environment
 variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
@@ -56,11 +62,11 @@ NOTE: The file conf/cwtoolrc.default contains the configuration for all
 
 NOTE: If you use devfs you have to determine yourself how to add the device
       nodes permanently. I do not plan to add support for it, because
-      devfs is now obsolete and will be removed in future versions of the
-      kernel. Starting with cw-0.11 basic support for udev was introduced,
-      so a 'make install' should add the needed things. But as every
-      distribution handles udev a little bit different it may not work on
-      your installation (see also step 2b below)
+      devfs is obsolete and removed in current versions of the kernel.
+      Starting with cw-0.11 basic support for udev was introduced, so a
+      'make install' should add the needed things. But as every distribution
+      handles udev a little bit different it may not work on your
+      installation (see also step 2b below)
 
 NOTE: You need to be root to do the things described below.
 
@@ -68,8 +74,20 @@ You may use cw without calling 'make install' if you do the following steps
 manually:
 
 1a) load the module
-    # insmod module/cw.o		(Linux 2.4)
-    # insmod module/cw.ko		(Linux 2.6)
+    # insmod module/cw.o			(Linux 2.4)
+    # insmod module/cw.ko			(Linux 2.6+)
+
+    For MK2 cards you need to load the module with an additional parameter:
+
+    # insmod module/cw.o cw_mk2_ports=0x1f0	(Linux 2.4, MK2 on primary
+    						 IDE)
+    # insmod module/cw.ko cw_mk2_ports=0x170	(Linux 2.6+, MK2 on secondary
+    						 IDE)
+
+    For the MK3/MK4/MK4plus cards make sure to unload the netjet ISDN kernel
+    module beforehand otherwise it is possible that no catweasel controller
+    will be found. The netjet module seems to look for the same PCI-IDs as
+    the cw module.
 
 1b) make sure the module was loaded correctly
     # lsmod
@@ -79,7 +97,8 @@ manually:
     messages from cw.
 
 2a) create the device nodes (up to 4 controllers are supported, every
-    controller may have up to 2 floppy drives)
+    controller may have up to 2 floppy drives). Here it is assumed you use
+    the default char major number 120.
     # mknod /dev/cw0raw0 c 120 31
     # mknod /dev/cw0raw1 c 120 63
     # mknod /dev/cw1raw0 c 120 95
@@ -94,7 +113,7 @@ manually:
     distribution needs to be done to make the device nodes permanent,
     otherwise they will disappear with the next reboot. If you have no luck
     with udev, just create a startscript with the above mknod lines and
-    execute it after udev was started up.
+    execute it after udev was started.
 
 3a) run cwtool to read a disk (in this case: read an Amiga 3.5" DD disk
     from the first drive on the first controller and write it to image.adf)
@@ -108,16 +127,19 @@ manually:
     are possible
     # man doc/cwtool.1
 
-If you use 'make install' to install cw then /etc/modules.conf (Linux 2.4)
-or /etc/modprobe.conf (Linux 2.6) will be modified to allow automatic module
-loading. Per default it uses char major number 120. If this major number is
-already in use (look at /proc/devices) you need to choose a different number.
-Use the command 'make install MAJOR=xx', where xx is a free char major number
-on your system. The following parameters are also possible, if these
-parameters are not specified more or less useful default values are used.
+If you use 'make install' to install cw then /etc/modules.conf (Linux 2.4),
+/etc/modprobe.conf or /etc/modprobe.d (Linux 2.6+) will be modified to allow
+automatic module loading. Per default char major number 120 is used. If this
+major number is already in use (look at /proc/devices) you need to choose a
+different number. Use the command 'make install MAJOR=xx', where xx is a free
+char major number on your system. The following parameters are also possible,
+if these parameters are not specified more or less useful default values are
+used.
 
 BIN_DIR             - directory in which cwtool is installed
 MAN_DIR             - the man page will be copied to $MAN_DIR/man1
+MK2_PORTS           - the port(s) of the MK2 card(s) (0x1f0 for primary IDE,
+                      0x170 for secondary IDE)
 MODULE_DIR          - directory in which the kernel driver module is
                       installed
 MODULE_NAME         - the name of the module (you need to choose a different
@@ -129,6 +151,11 @@ MODULES_CONF        - full path of the modules.conf or modprobe.conf file
 UDEV_STATIC_DEVICES - this file contains static entries for device nodes,
                       if it exists entries suitable for cw are added
 		      (seems only to exist on SuSE 10.0)
+
+NOTE: For MK2 cards, you will need a special 40-pin IDE cable that has pins
+      37 and 38 (IDE_CS0 and IDE_CS1) swapped. You have to specify the
+      MK2_PORTS parameter otherwise no such card will be found. In addition,
+      make sure that other drivers do not use these ports.
 
 NOTE: You may use 'make upgrade' if you want to upgrade from an older
       version of cw, but you need to specify those parameters that differ
@@ -148,14 +175,14 @@ NOTE: You may use 'make uninstall' to uninstall cw, the parameters of
   =================
 
 
-In the contrib directory you will find a simple GUI for cwtool written by
-David Bentham (aka PegXlin DEV). If you want to use it, consult the according
-README in contrib/cwtoolgui. If you have enhancements for this GUI or other
-useful additions, please contact me under the mail address listed at the
-start of this README.
+1) In the contrib directory you will find a simple GUI for cwtool written by
+   David Bentham (aka PegXlin DEV). If you want to use it, consult the
+   according README in contrib/cwtoolgui. If you have enhancements for this
+   GUI or other useful additions, please contact me under the mail address
+   listed at the start of this README.
 
-If you want to use the kernel driver of cw for your own programs please have
-a look at the src/cwio directory.
+2) If you want to use the kernel driver of cw for your own programs please
+   have a look at the src/cwio directory.
 
 
   ====================
@@ -205,3 +232,22 @@ hardsec_cw - http://webpages.charter.net/thecomputercollection/hardsec_cw.tar.gz
 
 (*) Currently you may load only one kernel module accessing the
     Catweasel controller at the same time.
+
+
+  =====================
+  [6] KNOWN FORKS OF CW
+  =====================
+
+
+https://github.com/ezrec/cw/
+	A patched version of cw-0.13 with support for MK2 cards. Current
+	versions of cw have built-in support for such cards.
+
+https://github.com/glaubitz/cw/
+	A patched version of cw-0.13 with compile time fixes for 2.6.38
+	kernels. Current versions of cw include those fixes.
+
+https://github.com/balr0g/cw/
+	A patched version of cw-0.13 with additional disk formats and
+	compile time fixes for cwtool for Mac OS X. Current versions of
+	cw include this.

@@ -22,7 +22,9 @@
 #include <stdlib.h>
 #endif /* !__KERNEL__ */
 
+#ifndef CW_STANDALONE
 #include <linux/types.h>
+#endif /* CW_STANDALONE */
 
 /* basic types */
 
@@ -36,16 +38,7 @@ typedef u32				cw_u32_t;
 typedef s64				cw_s64_t;
 typedef u64				cw_u64_t;
 #else /* __KERNEL__ */
-#ifndef CW_STANDALONE	/* currently not used */
-typedef __s8				cw_s8_t;
-typedef __u8				cw_u8_t;
-typedef __s16				cw_s16_t;
-typedef __u16				cw_u16_t;
-typedef __s32				cw_s32_t;
-typedef __u32				cw_u32_t;
-typedef __s64				cw_s64_t;
-typedef __u64				cw_u64_t;
-#else /* !CW_STANDALONE */
+#ifdef CW_STANDALONE
 typedef signed char			cw_s8_t;
 typedef unsigned char			cw_u8_t;
 typedef signed short			cw_s16_t;
@@ -54,7 +47,16 @@ typedef signed int			cw_s32_t;
 typedef unsigned int			cw_u32_t;
 typedef signed long long		cw_s64_t;
 typedef unsigned long long		cw_u64_t;
-#endif /* !CW_STANDALONE */
+#else /* CW_STANDALONE */
+typedef __s8				cw_s8_t;
+typedef __u8				cw_u8_t;
+typedef __s16				cw_s16_t;
+typedef __u16				cw_u16_t;
+typedef __s32				cw_s32_t;
+typedef __u32				cw_u32_t;
+typedef __s64				cw_s64_t;
+typedef __u64				cw_u64_t;
+#endif /* CW_STANDALONE */
 #endif /* __KERNEL__ */
 
 typedef int				cw_int_t;

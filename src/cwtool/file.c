@@ -58,7 +58,20 @@ file_tmp(
 	if (path == NULL) error_oom();
 	if (tmp_dir == NULL) tmp_dir = "/tmp";
 	if (gettimeofday(&tv, NULL) == -1) error_perror_message("error while gettimeofday()");
-	len = snprintf(path, size, "%s/%s-%010d-%010ld-%06ld-%05d", tmp_dir, global_program_name(), count++, tv.tv_sec, tv.tv_usec, getpid());
+	len = snprintf(
+		path,
+		size,
+#ifdef __APPLE__
+		"%s/%s-%010d-%010ld-%06ld-%05d"
+#else /* __APPLE__ */
+		"%s/%s-%010d-%010ld-%06ld-%05d",
+#endif /* __APPLE__ */
+		tmp_dir,
+		global_program_name(),
+		count++,
+		tv.tv_sec,
+		tv.tv_usec,
+		getpid());
 	if ((len == -1) || (len >= size)) error_message("path for tmp file too long");
 	return (path);
 	}
