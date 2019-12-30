@@ -83,6 +83,7 @@ static int				nconfig_evals;
 static char				config_type[CWTOOL_MAX_CONFIG_FILES + CWTOOL_MAX_CONFIG_EVALS];
 static int				nconfig_types;
 static int				retry = 5;
+static int				ignore_size;
 static FILE				*info_fh;
 
 
@@ -120,9 +121,10 @@ config_read_file(
 	{
 	struct file			fil;
 	char				data[CWTOOL_MAX_CONFIG_SIZE];
+	int				mode = (no_error) ? FILE_MODE_READ3 : FILE_MODE_READ;
 	int				size;
 
-	if (! file_open(&fil, path, FILE_MODE_READ, no_error)) return;
+	if (! file_open(&fil, path, mode)) return;
 	size = file_read(&fil, (unsigned char *) data, sizeof (data));
 	if (size == sizeof (data)) error("file '%s' too large for config", path);
 	file_close(&fil);
@@ -282,28 +284,32 @@ info_print(
 	int				summary)
 
 	{
+	const static char		space[] = "                                                                               ";
 	char				line[1024], end = '\r';
-	int				selector = 0;
+	int				selector = 0, i = 0;
 
 	if (verbose_level < 0) return;
 
 	if (mode == CWTOOL_MODE_WRITE) selector += 4;
-	if (summary) end = '\n', selector += 2;
-	if (dsk_nfo->sum.sectors_good + dsk_nfo->sum.sectors_weak +
-		dsk_nfo->sum.sectors_bad + dsk_nfo->sectors_good +
-		dsk_nfo->sectors_weak + dsk_nfo->sectors_bad > 0) selector++;
+	if (summary)
+		{
+		end = '\n';
+		selector += 2;
+		if (dsk_nfo->sum.sectors_good + dsk_nfo->sum.sectors_weak + dsk_nfo->sum.sectors_bad > 0) selector++;
+		}
+	else if (dsk_nfo->sectors_good + dsk_nfo->sectors_weak + dsk_nfo->sectors_bad > 0) selector++;
 
-	if (selector == 0) do_snprintf(line, sizeof (line), "reading track %3d try %2d",
+	if (selector == 0) do_snprintf(line, sizeof (line), "reading track %3d try %2d (sectors: none)",
 		dsk_nfo->track, dsk_nfo->try);
 	if (selector == 1) do_snprintf(line, sizeof (line), "reading track %3d try %2d (sectors: good %2d weak %2d bad %2d)",
 		dsk_nfo->track, dsk_nfo->try, dsk_nfo->sectors_good,
 		dsk_nfo->sectors_weak, dsk_nfo->sectors_bad);
-	if (selector == 2) do_snprintf(line, sizeof (line), "%3d tracks read         ",
+	if (selector == 2) do_snprintf(line, sizeof (line), "%3d tracks read",
 		dsk_nfo->sum.tracks);
-	if (selector == 3) do_snprintf(line, sizeof (line), "%3d tracks read (sectors: good %4d weak %4d bad %4d)   ",
+	if (selector == 3) do_snprintf(line, sizeof (line), "%3d tracks read (sectors: good %4d weak %4d bad %4d)",
 		dsk_nfo->sum.tracks, dsk_nfo->sum.sectors_good,
 		dsk_nfo->sum.sectors_weak, dsk_nfo->sum.sectors_bad);
-	if (selector == 4) do_snprintf(line, sizeof (line), "writing track %3d",
+	if (selector == 4) do_snprintf(line, sizeof (line), "writing track %3d (sectors: none)",
 		dsk_nfo->track);
 	if (selector == 5) do_snprintf(line, sizeof (line), "writing track %3d (sectors: %2d)",
 		dsk_nfo->track, dsk_nfo->sectors_good);
@@ -312,8 +318,9 @@ info_print(
 	if (selector == 7) do_snprintf(line, sizeof (line), "%3d tracks written (sectors: %4d)",
 		dsk_nfo->sum.tracks, dsk_nfo->sum.sectors_good);
 
+	while ((line[i] != '\0') && (space[i] != '\0')) i++;
 	if ((verbose_level != 0) || (debug_level != 0)) verbose(0, "%s", line);
-	else fprintf(info_fh, "%s%c", line, end);
+	else fprintf(info_fh, "%s%s%c", line, &space[i], end);
 	}
 
 
@@ -326,7 +333,8 @@ cmd_read(
 	struct disk			*dsk)
 
 	{
-	struct disk_option		dsk_opt = DISK_OPTION_INIT(info_print, retry);
+	int				flags = (ignore_size) ? DISK_OPTION_FLAG_IGNORE_SIZE : DISK_OPTION_FLAG_NONE;
+	struct disk_option		dsk_opt = DISK_OPTION_INIT(info_print, retry, flags);
 
 	disk_read(dsk, &dsk_opt, file_src, file_dst);
 	}
@@ -341,7 +349,8 @@ cmd_write(
 	struct disk			*dsk)
 
 	{
-	struct disk_option		dsk_opt = DISK_OPTION_INIT(info_print, retry);
+	int				flags = (ignore_size) ? DISK_OPTION_FLAG_IGNORE_SIZE : DISK_OPTION_FLAG_NONE;
+	struct disk_option		dsk_opt = DISK_OPTION_INIT(info_print, retry, flags);
 
 	disk_write(dsk, &dsk_opt, file_src, file_dst);
 	}
@@ -353,10 +362,10 @@ cmd_write(
  ****************************************************************************/
 static void
 cmdline_fill_space(
-	char				*s)
+	char				*string)
 
 	{
-	while (*s != '\0') *s++ = ' ';
+	while (*string != '\0') *string++ = ' ';
 	}
 
 
@@ -384,7 +393,7 @@ cmdline_usage(
 		"       %s    [--] <diskname> <srcfile>\n"
 		"or:    %s -R [-v] [-n] [-f <file>] [-e <config>] [-r <num>]\n"
 		"       %s    [--] <diskname> <srcfile> <dstfile>\n"
-		"or:    %s -W [-v] [-n] [-f <file>] [-e <config>]\n"
+		"or:    %s -W [-v] [-n] [-f <file>] [-e <config>] [-s]\n"
 		"       %s    [--] <diskname> <srcfile> <dstfile>\n\n"
 		"  -V            print out version\n"
 		"  -D            dump builtin config\n"
@@ -400,6 +409,7 @@ cmdline_usage(
 		"  -f <file>     read additional config file\n"
 		"  -e <config>   evaluate given string as config\n"
 		"  -r <num>      number of retries if errors occur\n"
+		"  -s            ignore size\n"
 		"  -h            this help\n",
 		space1, space1, program_name, program_name, program_name,
 		program_name, space2, program_name, space2, program_name,
@@ -567,16 +577,16 @@ cmdline_parse(
 			config_evals[nconfig_evals++] = cmdline_check_stdin("-e/--evaluate", *argv++);
 			config_type[nconfig_types++]  = 'e';
 			}
-		else if (mode != CWTOOL_MODE_READ)
-			{
-			goto bad_option;
-			}
-		else if ((string_equal(arg, "-r")) || (string_equal(arg, "--retry")))
+		else if (((string_equal(arg, "-r")) || (string_equal(arg, "--retry"))) && (mode == CWTOOL_MODE_READ))
 			{
 			int		i = 0;
 
 			if (*argv != NULL) i = sscanf(*argv++, "%d", &retry);
 			if ((i != 1) || (retry < 0) || (retry > 99)) error_message("-r/--retry expects a valid number of retries");
+			}
+		else if (((string_equal(arg, "-s")) || (string_equal(arg, "--ignore-size"))) && (mode == CWTOOL_MODE_WRITE))
+			{
+			ignore_size = 1;
 			}
 		else
 			{
@@ -599,6 +609,8 @@ main(
 
 	{
 	struct disk			*dsk;
+
+	setlinebuf(stderr);
 
 	/* parse cmdline */
 

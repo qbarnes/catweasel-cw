@@ -72,22 +72,6 @@ _error_oom(
 
 
 /****************************************************************************
- * _error_internal
- ****************************************************************************/
-void
-_error_internal(
-	char				*file,
-	int				line)
-
-	{
-	_error_head(file, line);
-	fprintf(stderr, "internal error\n");
-	exit(1);
-	}
-
-
-
-/****************************************************************************
  * _error_message
  ****************************************************************************/
 void
@@ -98,7 +82,8 @@ _error_message(
 
 	{
 	_error_head(file, line);
-	fprintf(stderr, "%s\n", msg);
+	if (msg == NULL) fprintf(stderr, "internal error\n");
+	else fprintf(stderr, "%s\n", msg);
 	exit(1);
 	}
 /******************************************************** Karsten Scheibler */

@@ -41,7 +41,7 @@
 #define debug_error_condition(cond)				\
 	do							\
 		{						\
-		if (cond) error_internal();			\
+		if (cond) error_message(#cond);			\
 		}						\
 	while (0)
 #else /* CWTOOL_DEBUG */

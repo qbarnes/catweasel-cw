@@ -16,15 +16,22 @@ program. The kernel driver should work with Linux 2.4 and 2.6. Look at the
 homepage of the manufacturer http://www.jschoenfeld.com/ for more details
 about the controller features.
 
-NOTE: There are 2 other Linux drivers for the Catweasel controller:
+RFDI: (request for disk images) To support more formats i need raw disk
+      images. I am especially interested in C1571, C1581 and Apple-Images,
+      if you have such disks, please use to following command:
+      # cwtool -R -v raw_14 /dev/cw0raw0 - | bzip2 -c - > image.cwraw.bz2
+      to create a raw disk image (/dev/cw0raw0 is the first drive on the
+      first controller, you need to change that if you use another drive).
 
-      catweasel - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
+NOTE: There are 3 other Linux drivers for the Catweasel controller:
+
+      catweasel(*) - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
       Linux driver for SID, Joysticks and Amiga keyboard. If you also want
       to use this package together with cw, remember to set MODULE_NAME to
       a different name, because catweasel uses the same name for the driver
       module (see the installation instructions below).
 
-      cwfloppy - http://www.soundtracker.org/raw/cwfloppy/, written by
+      cwfloppy(*) - http://www.soundtracker.org/raw/cwfloppy/, written by
       Michael Krause. A Linux driver for accessing the floppies on a
       Catweasel controller. This driver exports block devices, so you are
       able to mount Amiga disks under Linux. Currently it supports Amiga
@@ -35,8 +42,15 @@ NOTE: There are 2 other Linux drivers for the Catweasel controller:
       to the calling program, so all format routines do not reside in the
       kernel driver anymore.
 
-      Currently you may load only one kernel module accessing the
-      Catweasel controller at the same time.
+      cw2dmk - http://www.tim-mann.org/catweasel.html, written by Tim Mann.
+      A Linux driver (other platforms are also supported) for accessing the
+      floppies on a Catweasel Controller, especially TRS80 related formats
+      are supported. This package does not use a kernel driver to access
+      the Catweasel controller, but you should avoid using this program
+      when a kernel driver from another package is loaded.
+
+      (*) Currently you may load only one kernel module accessing the
+          Catweasel controller at the same time.
 
 NOTE: If you want to read both sides of a C1541 disk you need to modify
       your 5.25" floppy drive, because of the missing index hole on the
@@ -115,6 +129,11 @@ cw was tested under different distributions with Linux kernel versions
 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 (all directly taken from
 http://www.kernel.org/), it was also succesfully compiled on Knoppix 4.0.2.
 
+You may build cwtool with dietlibc, just set and export the environment
+variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
+is a libc that is optimized for small size, look at
+http://www.fefe.de/dietlibc/ for more.
+
 
   ===================================
   [3] SHORT INSTALLATION INSTRUCTIONS
@@ -136,7 +155,7 @@ NOTE: The file conf/cwtoolrc.default contains the configuration for all
       you may also write it in one line):
       # cwtool -W -v -v -e 'disk "test" { format "gcr_cbm" sectors 21
             skew 0 interleave 0 track 0 { } }' test /dev/zero /dev/null
-      First change the number after 'skew' and then that after 'interleave'
+      First change the number after 'skew' and then after 'interleave'
       to see the effect. You may also write the string after option -e to a
       file and use the option -f to let cwtool read this file.
 
@@ -197,6 +216,11 @@ MODULE_NAME  - the name of the module (you need to choose a different name
                than 'cw' if you also use the catweasel package)
 MODULES_CONF - full path of the modules.conf or modprobe.conf file
 
-NOTE: You may also use 'make uninstall' to uninstall cw, the parameters of
+NOTE: You may use 'make upgrade' if you want to upgrade from an older
+      version of cw, but you need to specify parameters differing from the
+      default values. Upgrading just means overwriting cwtool, the kernel
+      module and the man page with the current versions.
+
+NOTE: You may use 'make uninstall' to uninstall cw, the parameters of
       the last 'make install' call are saved and are used for uninstalling,
       but after a 'make clean' these saved parameters will be lost.

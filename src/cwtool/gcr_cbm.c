@@ -223,6 +223,20 @@ gcr_cbm_checksum(
 
 
 /****************************************************************************
+ * gcr_cbm_track_number
+ ****************************************************************************/
+static int
+gcr_cbm_track_number(
+	struct gcr_cbm			*gcr_cbm,
+	int				track)
+
+	{
+	return (track / gcr_cbm->rw.track_step + 1);
+	}
+
+
+
+/****************************************************************************
  * gcr_cbm_read_sector2
  ****************************************************************************/
 static int
@@ -297,7 +311,7 @@ gcr_cbm_read_sector(
 	/* accept only valid sector numbers */
 
 	sector = header[2];
-	track  = track / 4 + 1;
+	track  = gcr_cbm_track_number(gcr_cbm, track);
 	if (sector >= gcr_cbm->rw.sectors)
 		{
 		verbose(1, "sector %d out of range", sector);
@@ -353,7 +367,7 @@ gcr_cbm_write_sector(
 	verbose(1, "writing sector %d", sector);
 	header[0] = gcr_cbm->rw.header_id;
 	header[2] = sector;
-	header[3] = track / 4 + 1;
+	header[3] = gcr_cbm_track_number(gcr_cbm, track);
 	header[4] = 0x30;
 	header[5] = 0x30;
 	header[6] = 0x0f;
@@ -456,7 +470,8 @@ gcr_cbm_write_track(
 #define MAGIC_SECTORS			10
 #define MAGIC_HEADER_ID			11
 #define MAGIC_DATA_ID			12
-#define MAGIC_BOUNDS			13
+#define MAGIC_TRACK_STEP		13
+#define MAGIC_BOUNDS			14
 
 
 
@@ -488,14 +503,15 @@ gcr_cbm_set_defaults(
 			},
 		.rw =
 			{
-			.sectors   = 21,
-			.header_id = 0x08,
-			.data_id   = 0x07,
-			.bnd       =
+			.sectors    = 21,
+			.header_id  = 0x08,
+			.data_id    = 0x07,
+			.track_step = 4,
+			.bnd        =
 				{
-				BOUNDS(0x0800, 0x1400, 0x1c00, 0),
-				BOUNDS(0x1d00, 0x2500, 0x2c00, 1),
-				BOUNDS(0x2d00, 0x3800, 0x4000, 2)
+				BOUNDS(0x0800, 0x1300, 0x1c00, 0),
+				BOUNDS(0x1d00, 0x2600, 0x2f00, 1),
+				BOUNDS(0x3000, 0x3900, 0x5000, 2)
 				}
 			}
 		};
@@ -562,9 +578,10 @@ gcr_cbm_set_rw_option(
 
 	{
 	debug(2, "setting rw option magic = %d, val = %d, ofs = %d", magic, val, ofs);
-	if (magic == MAGIC_SECTORS)   return (setvalue_uchar(&fmt->gcr_cbm.rw.sectors, val, 1, CWTOOL_MAX_SECTOR));
-	if (magic == MAGIC_HEADER_ID) return (setvalue_uchar(&fmt->gcr_cbm.rw.header_id, val, 0, 0xff));
-	if (magic == MAGIC_DATA_ID)   return (setvalue_uchar(&fmt->gcr_cbm.rw.data_id, val, 0, 0xff));
+	if (magic == MAGIC_SECTORS)    return (setvalue_uchar(&fmt->gcr_cbm.rw.sectors, val, 1, CWTOOL_MAX_SECTOR));
+	if (magic == MAGIC_HEADER_ID)  return (setvalue_uchar(&fmt->gcr_cbm.rw.header_id, val, 0, 0xff));
+	if (magic == MAGIC_DATA_ID)    return (setvalue_uchar(&fmt->gcr_cbm.rw.data_id, val, 0, 0xff));
+	if (magic == MAGIC_TRACK_STEP) return (setvalue_uchar(&fmt->gcr_cbm.rw.track_step, val, 1, 4));
 	debug_error_condition(magic != MAGIC_BOUNDS);
 	return (setvalue_bounds(fmt->gcr_cbm.rw.bnd, val, ofs));
 	}
@@ -634,10 +651,11 @@ static struct format_option		gcr_cbm_write_options[] =
  ****************************************************************************/
 static struct format_option		gcr_cbm_rw_options[] =
 	{
-	FORMAT_OPTION("sectors",   MAGIC_SECTORS,   1),
-	FORMAT_OPTION("header_id", MAGIC_HEADER_ID, 1),
-	FORMAT_OPTION("data_id",   MAGIC_DATA_ID,   1),
-	FORMAT_OPTION("bounds",    MAGIC_BOUNDS,    9),
+	FORMAT_OPTION("sectors",      MAGIC_SECTORS,      1),
+	FORMAT_OPTION("header_id",    MAGIC_HEADER_ID,    1),
+	FORMAT_OPTION("data_id",      MAGIC_DATA_ID,      1),
+	FORMAT_OPTION("track_step",   MAGIC_TRACK_STEP,   1),
+	FORMAT_OPTION("bounds",       MAGIC_BOUNDS,       9),
 	FORMAT_OPTION(NULL, 0, 0)
 	};
 

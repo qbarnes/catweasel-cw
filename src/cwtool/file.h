@@ -15,9 +15,10 @@
 
 #include "cwtool.h"
 
-#define FILE_MAX_NAME_LEN		CWTOOL_MAX_NAME_LEN
-#define FILE_MODE_READ			1
-#define FILE_MODE_WRITE			2
+#define FILE_MODE_READ			1	/* normal */
+#define FILE_MODE_READ2			2	/* do not check file size */
+#define FILE_MODE_READ3			3	/* do not exit on error */
+#define FILE_MODE_WRITE			4
 #define FILE_TYPE_REGULAR		1
 #define FILE_TYPE_DEVICE		2
 
@@ -40,16 +41,17 @@ struct file_track
 	{
 	unsigned char			flags;
 	unsigned char			clock;
+	unsigned char			side_offset;
+	unsigned char			reserved;
 	unsigned short			timeout_read;
 	unsigned short			timeout_write;
-	unsigned short			reserved;
 	};
 
 struct fifo;
 
 struct file_image
 	{
-	char				name[FILE_MAX_NAME_LEN];
+	char				name[CWTOOL_MAX_NAME_LEN];
 	int				level;
 	int				(*open)(struct file *, const char *, int);
 	int				(*close)(struct file *);
@@ -61,7 +63,7 @@ struct file_image
 extern struct file_image		file_image_raw;
 extern struct file_image		file_image_plain;
 extern struct file_image		*file_search_image(const char *);
-extern int				file_open(struct file *, const char *, int, int);
+extern int				file_open(struct file *, const char *, int);
 extern int				file_close(struct file *);
 extern int				file_read(struct file *, unsigned char *, int);
 extern int				file_write(struct file *, const unsigned char *, int);

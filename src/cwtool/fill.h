@@ -1,7 +1,7 @@
 /****************************************************************************
  ****************************************************************************
  *
- * version.h
+ * fill.h
  *
  ****************************************************************************
  ****************************************************************************/
@@ -10,13 +10,20 @@
 
 
 
-#ifndef CW_VERSION_H
-#define CW_VERSION_H
+#ifndef CWTOOL_FILL_H
+#define CWTOOL_FILL_H
 
-#define VERSION				"0.09"
-#define VERSION_DATE			"20060110"
+struct fill
+	{
+	struct
+		{
+		unsigned char		fill_value;
+		unsigned char		reserved[3];
+		unsigned int		fill_length;
+		}			wr;
+	};
 
 
 
-#endif /* !CW_VERSION_H */
+#endif /* !CWTOOL_FILL_H */
 /******************************************************** Karsten Scheibler */

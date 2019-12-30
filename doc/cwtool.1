@@ -10,7 +10,7 @@
 .fi
 ..
 
-.TH cwtool 1 "cw 0.08"
+.TH cwtool 1 "cw 0.09"
 
 .SH NAME
 cwtool \- tool for reading and writing floppy disk images with a Catweasel controller
@@ -55,6 +55,7 @@ cwtool \- tool for reading and writing floppy disk images with a Catweasel contr
 [\-n]
 [\-f \fI<file>\fR]
 [\-e \fI<config>\fR]
+[\-s]
 \fI<diskname>\fR
 \fI<srcfile>\fR
 \fI<dstfile>\fR
@@ -64,17 +65,17 @@ cwtool \- tool for reading and writing floppy disk images with a Catweasel contr
 \fBcwtool\fR is the user space companion program for the cw kernel driver module. cw is a package for the Catweasel controller especially for accessing the floppy drives connected to Catweasel. Some preliminary remarks:
 .RS
 .IP * 2
-\fBcwtool\fR uses one number for track numbering, this number contains the hardware track and side. The calculation is rather simple: 2 * hardware_track + side. With the options \-R \-v or \-W \-v you will see such numbers
+\fBcwtool\fR uses one number for track numbering, this number contains the hardware track and side. The calculation is rather simple, in most cases it is: 2 * hardware_track + side, the C1571 formats use another numbering scheme: hardware_track + side_offset * side. With the options \-R \-v or \-W \-v you will see such numbers.
 .IP * 2
 Options like \-D, \-n, \-f or \-e refer to a configuration. The configuration directives and syntax are currently undocumented, because they may change in future versions.
 .IP * 2
-If you want to use files named \- use ./\-, otherwise \fBcwtool\fR will use stdin or stdout (depending on the file being source or destination).
+If you want to use files named \- use ./\-, because otherwise \fBcwtool\fR would use stdin or stdout (depending on the file being source or destination).
 .IP * 2
-\fBcwtool\fR reads or writes disk images it does not care if these images contain valid file systems or not.
+\fBcwtool\fR reads or writes disk images, it does not care if these images contain valid file systems or not.
 .IP * 2
 If you have problems reading 3.5 inch HD disks written in a DD drive, or if you are unable to read the flip side of a C1541 disk, please consult the README file coming with the source distribution of cw.
 .IP * 2
-Not all formats have been extensivly tested, if you have problems please contact the author (the email address is listed in the README of the source distribution).
+Not all formats have been extensively tested, if you have problems please contact the author (the email address is listed in the README of the source distribution).
 .RE
 
 .SH OPTIONS
@@ -102,6 +103,8 @@ Read additional config from \fI<file>\fR.
 Evaluate the given string \fI<config>\fR as configuration parameters.
 .IP "\-r \fI<num>\fR, \-\-retry \fI<num>\fR" 8
 Retry \fI<num>\fR times on read errors.
+.IP "\-s, \-\-ignore\-size" 8
+Do not check if input file is larger than needed and do not warn if it is smaller.
 
 .SH EXAMPLES
 .IP "1." 8
@@ -148,7 +151,7 @@ Write image.adf to disk, read it in and compare with the original data, if there
 \&\fBcwtool\fR \-R \-v raw_14 /dev/cw0raw0 \- |
 \&\fBbzip2\fR \-c \- > image.cwraw.bz2
 .Ve
-Read a disk with 14 MHz and compress the data on the fly. The written data is in raw format, this means it contains just the values \fBcwtool\fR got from the kernel driver. This is useful for later analysis of the disk format, if the format is currently not supported by \fBcwtool\fR (DD disk should be read with raw_14 and HD disks with raw_28).
+Read a disk with 14 MHz and compress the data on the fly. The written data is in raw format, this means it contains just the values \fBcwtool\fR got from the kernel driver. This is useful for later analysis of the disk format, if the format is currently not supported by \fBcwtool\fR (DD disks should be read with raw_14 and HD disks with raw_28).
 
 .IP "8." 8
 .Vb

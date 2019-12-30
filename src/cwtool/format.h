@@ -19,6 +19,7 @@
 #include "mfm_nec765.h"
 #include "mfm_amiga.h"
 #include "tbe_cw.h"
+#include "fill.h"
 
 union format
 	{
@@ -28,6 +29,7 @@ union format
 	struct mfm_nec765		mfm_nec;
 	struct mfm_amiga		mfm_amg;
 	struct tbe_cw			tbe_cw;
+	struct fill			fll;
 	};
 
 #define FORMAT_OPTION(n, m, p)		{ .name = n, .magic = m, .params = p }

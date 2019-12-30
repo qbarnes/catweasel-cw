@@ -39,7 +39,7 @@ struct gcr_cbm
 		unsigned char		sectors;
 		unsigned char		header_id;
 		unsigned char		data_id;
-		unsigned char		reserved;
+		unsigned char		track_step;
 		struct bounds		bnd[3];
 		}			rw;
 	};

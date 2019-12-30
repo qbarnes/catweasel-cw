@@ -25,6 +25,23 @@ copy_file()
 
 
 #############################################################################
+# upgrade_file
+#############################################################################
+upgrade_file()
+	{
+	[ -e "$1" ] || return
+	if [ ! -e "$2" ]; then
+		echo "file '$2' not found, no upgrade possible" 1>&2
+		exit 1
+	fi
+	echo "upgrading '$1' -> '$2'" &&
+	chown root:root "$1" &&
+	cp -a "$1" "$2" || exit 1
+	}
+
+
+
+#############################################################################
 # remove_file
 #############################################################################
 remove_file()
@@ -32,6 +49,23 @@ remove_file()
 	[ -e "$1" ] || return
 	echo "removing '$1'" &&
 	rm -f "$1" || exit 1
+	}
+
+
+
+#############################################################################
+# write_uninstall_info
+#############################################################################
+write_uninstall_info()
+	{
+	cat <<-EOC > .uninstall
+	MAJOR="$MAJOR"
+	BIN_DIR="$BIN_DIR"
+	MAN_DIR="$MAN_DIR"
+	MODULE_DIR="$MODULE_DIR"
+	MODULE_NAME="$MODULE_NAME"
+	MODULES_CONF="$MODULES_CONF"
+	EOC
 	}
 
 
@@ -131,7 +165,16 @@ cleanup_modules_conf()
 	awk '! /^alias char-major-'"$MAJOR $MODULE_NAME"'$/ && ! /^options '"$MODULE_NAME"' cw_major='"$MAJOR"'$/'  \
 		"$MODULES_CONF" > "$MODULES_CONF.tmp" &&
 	cat "$MODULES_CONF.tmp" > "$MODULES_CONF" &&
-	rm -f "$MODULES_CONF.tmp" &&
+	rm -f "$MODULES_CONF.tmp" || exit 1
+	}
+
+
+
+#############################################################################
+# unload_module
+#############################################################################
+unload_module()
+	{
 	echo "removing kernel module (if loaded)" &&
 	rmmod cw "$MODULE_NAME" 2>/dev/null
 	echo "executing depmod" &&
@@ -185,22 +228,23 @@ if [ -z "$MODULES_CONF" ]; then
 fi
 MAN_DIR="$MAN_DIR/man1"
 
-if [ "$(basename $0)" = "install.sh" ]; then
+PROGRAM_NAME="$(basename $0)"
+if [ "$PROGRAM_NAME" = "install.sh" ]; then
 	check_char_major
-	cat <<-EOC > .uninstall
-	MAJOR="$MAJOR"
-	BIN_DIR="$BIN_DIR"
-	MAN_DIR="$MAN_DIR"
-	MODULE_DIR="$MODULE_DIR"
-	MODULE_NAME="$MODULE_NAME"
-	MODULES_CONF="$MODULES_CONF"
-	EOC
+	write_uninstall_info
 	copy_file "bin/cwtool" "$BIN_DIR/cwtool"
 	copy_file "module/cw.o" "$MODULE_DIR/$MODULE_NAME.o"
 	copy_file "module/cw.ko" "$MODULE_DIR/$MODULE_NAME.ko"
 	copy_file "doc/cwtool.1" "$MAN_DIR/cwtool.1"
 	modify_modules_conf
 	create_device_nodes
+elif [ "$PROGRAM_NAME" = "upgrade.sh" ]; then
+	write_uninstall_info
+	upgrade_file "bin/cwtool" "$BIN_DIR/cwtool"
+	upgrade_file "module/cw.o" "$MODULE_DIR/$MODULE_NAME.o"
+	upgrade_file "module/cw.ko" "$MODULE_DIR/$MODULE_NAME.ko"
+	upgrade_file "doc/cwtool.1" "$MAN_DIR/cwtool.1"
+	unload_module
 else
 	[ -f .uninstall ] && . .uninstall
 	remove_file "$BIN_DIR/cwtool"
@@ -208,6 +252,7 @@ else
 	remove_file "$MODULE_DIR/$MODULE_NAME.ko"
 	remove_file "$MAN_DIR/cwtool.1"
 	cleanup_modules_conf
+	unload_module
 	remove_device_nodes
 fi
 ######################################################### Karsten Scheibler #

@@ -1,2 +1,14 @@
+cw-0.09-20060110
+	* new option: -s
+	* changed configuration for c1541, c1541_40, c1571 and c1571_40,
+	  disks written with version 0.08 may cause read errors in
+	  original C1541 and C1571 drives, because the heads are thicker
+	  and are also influenced by data between the tracks (one track
+	  on C1541/C1571 drives are two tracks in 5.25" HD drives), when
+	  writing such disks the tracks inbetween are now cleared,
+	  furthermore other timings are used
+	* corrected track numbering for c1571, but i do not own a C1571 so
+	  i could not test if it works now correctly
+
 cw-0.08-20051202
 	* first official release

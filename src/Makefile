@@ -4,7 +4,7 @@ MAKE=make
 
 all:
 	${MAKE} -C driver all
-	${MAKE} -C cwtool all
+	${MAKE} -C cwtool all DIET="${DIET}"
 
 clean:
 	${MAKE} -C driver clean

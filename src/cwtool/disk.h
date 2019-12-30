@@ -75,12 +75,15 @@ struct disk_info
 	struct disk_summary		sum;
 	};
 
-#define DISK_OPTION_INIT(i, r)		(struct disk_option) { .info_func = i, .retry = r }
+#define DISK_OPTION_INIT(i, r, f)	(struct disk_option) { .info_func = i, .retry = r, .flags = f }
+#define DISK_OPTION_FLAG_NONE		0
+#define DISK_OPTION_FLAG_IGNORE_SIZE	(1 << 0)
 
 struct disk_option
 	{
 	void				(*info_func)(struct disk_info *, int);
 	int				retry;
+	int				flags;
 	};
 
 extern struct disk			*disk_get(int);
@@ -97,12 +100,13 @@ extern int				disk_set_name(struct disk *, const char *);
 extern int				disk_set_info(struct disk *, const char *);
 extern int				disk_set_track(struct disk *, struct disk_track *, int);
 extern int				disk_set_format(struct disk_track *, struct format_desc *);
-extern int				disk_set_clock(struct disk_track *, int);
-extern int				disk_set_timeout_read(struct disk_track *, int);
-extern int				disk_set_timeout_write(struct disk_track *, int);
 extern int				disk_set_indexed_read(struct disk_track *, int);
 extern int				disk_set_indexed_write(struct disk_track *, int);
 extern int				disk_set_flip_side(struct disk_track *, int);
+extern int				disk_set_clock(struct disk_track *, int);
+extern int				disk_set_side_offset(struct disk_track *, int);
+extern int				disk_set_timeout_read(struct disk_track *, int);
+extern int				disk_set_timeout_write(struct disk_track *, int);
 extern int				disk_set_read_option(struct disk_track *, struct format_option *, int, int);
 extern int				disk_set_write_option(struct disk_track *, struct format_option *, int, int);
 extern int				disk_set_rw_option(struct disk_track *, struct format_option *, int, int);

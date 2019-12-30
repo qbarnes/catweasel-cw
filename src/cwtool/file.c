@@ -63,6 +63,71 @@ static struct file_image		*fil_img[] =
 
 
 /****************************************************************************
+ * file_mode_read_size_check
+ ****************************************************************************/
+static int
+file_mode_read_size_check(
+	int				mode)
+
+	{
+	if (mode == FILE_MODE_READ) return (1);
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * file_mode_read_no_error
+ ****************************************************************************/
+static int
+file_mode_read_no_error(
+	int				mode)
+
+	{
+	if (mode == FILE_MODE_READ3) return (1);
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * file_mode_read
+ ****************************************************************************/
+static int
+file_mode_read(
+	int				mode)
+
+	{
+	if (mode == FILE_MODE_READ)  return (1);
+	if (mode == FILE_MODE_READ2) return (1);
+	if (mode == FILE_MODE_READ3) return (1);
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * file_mode_write
+ ****************************************************************************/
+static int
+file_mode_write(
+	int				mode)
+
+	{
+	if (mode == FILE_MODE_WRITE) return (1);
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * file_mode_valid
+ ****************************************************************************/
+#define file_mode_valid(mode)		((file_mode_read(mode)) || (file_mode_write(mode)))
+
+
+
+/****************************************************************************
  * file_detect_type
  ****************************************************************************/
 static int
@@ -76,7 +141,7 @@ file_detect_type(
 
 	/* check if we have a regular file or a catweasel device */
 
-	debug_error_condition((fil->mode != FILE_MODE_READ) && (fil->mode != FILE_MODE_WRITE));
+	debug_error_condition(! file_mode_valid(fil->mode));
 	type_name = "device";
 	fil->type = FILE_TYPE_DEVICE;
 	fil->fli  = CW_FLOPPYINFO_INIT;
@@ -84,12 +149,12 @@ file_detect_type(
 
 	/* fil->fd belongs to a regular file, check file header */
 
-	if (fil->mode == FILE_MODE_READ)
+	if (file_mode_read(fil->mode))
 		{
-		if (file_read(fil, buffer, sizeof (buffer)) != sizeof (buffer)) error("file '%s' truncated", fil->path);
+		if (file_read(fil, (unsigned char *) buffer, sizeof (buffer)) != sizeof (buffer)) error("file '%s' truncated", fil->path);
 		for (i = 0; i < sizeof (magic); i++) if (magic[i] != buffer[i]) error("file '%s' has wrong magic", fil->path);
 		}
-	else file_write(fil, magic, sizeof (magic));
+	else file_write(fil, (unsigned char *) magic, sizeof (magic));
 	type_name = "file";
 	fil->type = FILE_TYPE_REGULAR;
 end:
@@ -138,6 +203,13 @@ file_ioctl(
 	tri.mode    = mode;
 	tri.data    = data;
 	tri.size    = size;
+	if (fil_trk->side_offset != 0)
+		{
+		tri.track = track;
+		tri.side  = (track >= fil_trk->side_offset) ? 1 : 0;
+		if (tri.side) tri.track -= fil_trk->side_offset;
+		tri.side ^= flip;
+		}
 	if (tri.clock >= fil->fli.clock_max) error("error while accessing track %d, clock is not supported by device '%s'", track, fil->path);
 	if (tri.track >= fil->fli.track_max) error("error while accessing track %d, track is not supported by device '%s'", track, fil->path);
 	if (tri.side  >= fil->fli.side_max)  error("error while accessing track %d, side is not supported by device '%s'", track, fil->path);
@@ -169,7 +241,7 @@ file_open_raw(
 	int				mode)
 
 	{
-	file_open(fil, path, mode, 0);
+	file_open(fil, path, mode);
 	file_detect_type(fil);
 	return (1);
 	}
@@ -237,12 +309,13 @@ file_read_raw2(
 	if (file_read(fil, (unsigned char *) fil_trk_hdr, size) != size) return ("header truncated");
 	if (fil_trk_hdr->magic != 0xca) return ("wrong header magic");
 	size = file_read_raw_size(fil_trk_hdr);
-	if (fil_trk_hdr->flags & HEADER_FLAG_WRITABLE) fifo_set_flags(ffo, FIFO_FLAG_WRITABLE);
-	if (fil_trk_hdr->flags & HEADER_FLAG_INDEXED)  fifo_set_flags(ffo, FIFO_FLAG_INDEXED);
 	if (size > fifo_get_limit(ffo)) return ("track too large");
 	if (file_read(fil, fifo_get_data(ffo), size) != size) return ("track truncated");
-	if (fil_trk_hdr->track != track) return (NULL);
+	if (fil_trk_hdr->track != track) goto end;
+	if (fil_trk_hdr->flags & HEADER_FLAG_WRITABLE) fifo_set_flags(ffo, FIFO_FLAG_WRITABLE);
+	if (fil_trk_hdr->flags & HEADER_FLAG_INDEXED)  fifo_set_flags(ffo, FIFO_FLAG_INDEXED);
 	if (fil_trk_hdr->clock != fil_trk->clock) return ("wrong clock");
+end:
 	return (NULL);
 	}
 
@@ -262,7 +335,7 @@ file_read_raw(
 	int				size = fifo_get_limit(ffo);
 	int				mode = CW_TRACKINFO_MODE_INDEX_STORE;
 
-	debug_error_condition(fil->mode != FILE_MODE_READ);
+	debug_error_condition(! file_mode_read(fil->mode));
 	debug_error_condition((fil->type != FILE_TYPE_REGULAR) && (fil->type != FILE_TYPE_DEVICE));
 	if (fil->type == FILE_TYPE_DEVICE)
 		{
@@ -359,7 +432,7 @@ file_write_raw(
 	int				size = fifo_get_wr_ofs(ffo);
 	int				mode = CW_TRACKINFO_MODE_NORMAL;
 
-	debug_error_condition(fil->mode != FILE_MODE_WRITE);
+	debug_error_condition(! file_mode_write(fil->mode));
 	debug_error_condition((fil->type != FILE_TYPE_REGULAR) && (fil->type != FILE_TYPE_DEVICE));
 	if (size < CWTOOL_MIN_TRACK_SIZE) error_warning("got only %d bytes for writing track %d", size, track);
 	if (fil->type == FILE_TYPE_DEVICE)
@@ -410,7 +483,7 @@ file_open_plain(
 	int				mode)
 
 	{
-	file_open(fil, path, mode, 0);
+	file_open(fil, path, mode);
 	return (1);
 	}
 
@@ -424,10 +497,13 @@ file_close_plain(
 	struct file			*fil)
 
 	{
-	char				buffer[1];
+	unsigned char			buffer[1];
 
-	if (fil->mode == FILE_MODE_READ) if (file_read(fil, buffer, 1) > 0)
-		error_warning("file '%s' is larger than needed", fil->path);
+	if (fil->end) goto end;
+	if (! file_mode_read_size_check(fil->mode)) goto end;
+	if (file_read(fil, buffer, 1) == 0) goto end;
+	error_warning("file '%s' is larger than needed", fil->path);
+end:
 	return (file_close(fil));
 	}
 
@@ -459,13 +535,14 @@ file_read_plain(
 	{
 	int				size = fifo_get_limit(ffo);
 
-	debug_error_condition(fil->mode != FILE_MODE_READ);
+	debug_error_condition(! file_mode_read(fil->mode));
 	fifo_set_wr_ofs(ffo, size);
-	if (fil->end) return (1);
+	if (fil->end) goto end;
 	size = file_read(fil, fifo_get_data(ffo), size);
-	if (size == fifo_get_limit(ffo)) return (1);
-	error_warning("file '%s' is shorter than needed", fil->path);
+	if (size == fifo_get_limit(ffo)) goto end;
+	if (file_mode_read_size_check(fil->mode)) error_warning("file '%s' is shorter than needed", fil->path);
 	fil->end = 1;
+end:
 	return (1);
 	}
 
@@ -484,7 +561,7 @@ file_write_plain(
 	{
 	int				size;
 
-	debug_error_condition(fil->mode != FILE_MODE_WRITE);
+	debug_error_condition(! file_mode_write(fil->mode));
 	size = file_write(fil, fifo_get_data(ffo), fifo_get_wr_ofs(ffo));
 	fifo_set_rd_ofs(ffo, size);
 	return (1);
@@ -557,8 +634,7 @@ int
 file_open(
 	struct file			*fil,
 	const char			*path,
-	int				mode,
-	int				no_error)
+	int				mode)
 
 	{
 	*fil = (struct file)
@@ -569,8 +645,8 @@ file_open(
 		.type = FILE_TYPE_REGULAR
 		};
 
-	debug_error_condition((fil->mode != FILE_MODE_READ) && (fil->mode != FILE_MODE_WRITE));
-	if (mode == FILE_MODE_WRITE)
+	debug_error_condition(! file_mode_valid(mode));
+	if (file_mode_write(mode))
 		{
 		if (string_equal(path, "-")) fil->fd = STDOUT_FILENO;
 		else fil->fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -582,7 +658,7 @@ file_open(
 		}
 	if (fil->fd == -1)
 		{
-		if (no_error) return (0);
+		if (file_mode_read_no_error(fil->mode)) return (0);
 		error_perror2("error while opening '%s'", path);
 		}
 	return (1);

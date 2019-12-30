@@ -18,7 +18,7 @@
 
 #define error_perror()			_error_perror(__FILE__, __LINE__)
 #define error_oom()			_error_oom(__FILE__, __LINE__)
-#define error_internal()		_error_internal(__FILE__, __LINE__)
+#define error_internal()		_error_message(__FILE__, __LINE__, NULL)
 #define error_message(msg)		_error_message(__FILE__, __LINE__, msg)
 
 #define error(msg...)					\
@@ -51,7 +51,6 @@
 extern void				_error_head(char *, int);
 extern void				_error_perror(char *, int);
 extern void				_error_oom(char *, int);
-extern void				_error_internal(char *, int);
 extern void				_error_message(char *, int, char *);
 
 

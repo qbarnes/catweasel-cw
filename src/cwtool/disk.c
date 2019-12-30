@@ -35,40 +35,43 @@
 /****************************************************************************
  * disk_sectors_init
  ****************************************************************************/
-static void
+static int
 disk_sectors_init(
-	struct disk_sector		*sct,
-	struct disk_track		*trk,
+	struct disk_sector		*dsk_sct,
+	struct disk_track		*dsk_trk,
 	struct fifo			*ffo,
 	int				write)
 
 	{
-	struct disk_sector		sct2[CWTOOL_MAX_SECTOR];
+	struct disk_sector		dsk_sct2[CWTOOL_MAX_SECTOR];
 	unsigned char			*data = fifo_get_data(ffo);
-	int				sectors = trk->fmt_dsc->get_sectors(&trk->fmt);
-	int				skew = trk->skew, interleave = trk->interleave;
+	int				sectors = dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt);
+	int				skew = dsk_trk->skew, interleave = dsk_trk->interleave;
 	int				errors = 0x7fffffff;
-	int				i, j;
+	int				size, i, j;
+
+	debug_error_condition(dsk_trk->fmt_dsc->get_sectors == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->get_sector_size == NULL);
 
 	/* initialize sct2[] */
 
 	if (write) errors = 0;
-	for (i = j = 0; i < sectors; j += sct2[i++].size)
+	for (i = j = 0; i < sectors; j += dsk_sct2[i++].size)
 		{
-		sct2[i] = (struct disk_sector)
+		dsk_sct2[i] = (struct disk_sector)
 			{
 			.number = i,
 			.data   = &data[j],
-			.size   = trk->fmt_dsc->get_sector_size(&trk->fmt, i),
+			.size   = dsk_trk->fmt_dsc->get_sector_size(&dsk_trk->fmt, i),
 			.err    = { .errors = errors }
 			};
 		}
 
 	/* set fifo limits for write or read */
 
-	j = trk->fmt_dsc->get_sector_size(&trk->fmt, -1);
-	if (write) fifo_set_limit(ffo, j);
-	else fifo_set_wr_ofs(ffo, j);
+	size = dsk_trk->fmt_dsc->get_sector_size(&dsk_trk->fmt, -1);
+	if (write) fifo_set_limit(ffo, size);
+	else fifo_set_wr_ofs(ffo, size);
 
 	/* on write apply sector shuffling according to skew and interleave */
 
@@ -76,8 +79,10 @@ disk_sectors_init(
 		{
 		if (write) j = (skew + i * (interleave + 1)) % sectors;
 		else j = i;
-		sct[i] = sct2[j];
+		dsk_sct[i] = dsk_sct2[j];
 		}
+
+	return (size);
 	}
 
 
@@ -192,9 +197,9 @@ disk_init_track_default(
 	struct disk			*dsk)
 
 	{
-	struct disk_track		trk = DISK_TRACK_INIT;
+	struct disk_track		dsk_trk = DISK_TRACK_INIT;
 
-	dsk->trk_def = trk;
+	dsk->trk_def = dsk_trk;
 	return (&dsk->trk_def);
 	}
 
@@ -251,18 +256,18 @@ disk_init_size(
 	struct disk			*dsk)
 
 	{
-	struct disk_track		*trk;
+	struct disk_track		*dsk_trk;
 	int				s, t;
 
 	for (t = 0; t < CWTOOL_MAX_TRACK; t++)
 		{
-		trk = &dsk->trk[t];
-		if (trk->fmt_dsc == NULL) continue;
-		debug_error_condition(trk->fmt_dsc->get_sectors == NULL);
-		debug_error_condition(trk->fmt_dsc->get_sector_size == NULL);
-		s = trk->fmt_dsc->get_sectors(&trk->fmt);
+		dsk_trk = &dsk->trk[t];
+		if (dsk_trk->fmt_dsc == NULL) continue;
+		debug_error_condition(dsk_trk->fmt_dsc->get_sectors == NULL);
+		debug_error_condition(dsk_trk->fmt_dsc->get_sector_size == NULL);
+		s = dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt);
 		debug_error_condition((s < 0) || (s > CWTOOL_MAX_SECTOR));
-		s = trk->fmt_dsc->get_sector_size(&trk->fmt, -1);
+		s = dsk_trk->fmt_dsc->get_sector_size(&dsk_trk->fmt, -1);
 		debug_error_condition((s < 0) || (s > CWTOOL_MAX_TRACK_SIZE));
 		dsk->size += s;
 		}
@@ -279,14 +284,14 @@ disk_image_ok(
 	struct disk			*dsk)
 
 	{
-	struct disk_track		*trk;
+	struct disk_track		*dsk_trk;
 	int				t;
 
 	for (t = 0; t < CWTOOL_MAX_TRACK; t++)
 		{
-		trk = &dsk->trk[t];
-		if (trk->fmt_dsc == NULL) continue;
-		if (trk->fmt_dsc->level != dsk->fil_img->level) return (0);
+		dsk_trk = &dsk->trk[t];
+		if (dsk_trk->fmt_dsc == NULL) continue;
+		if (dsk_trk->fmt_dsc->level != dsk->fil_img->level) return (0);
 		}
 	return (1);
 	}
@@ -375,13 +380,13 @@ disk_set_info(
 int
 disk_set_track(
 	struct disk			*dsk,
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	int				track)
 
 	{
 	if ((track < 0) || (track >= CWTOOL_MAX_TRACK)) return (0);
 	debug(2, "setting track %d", track);
-	dsk->trk[track] = *trk;
+	dsk->trk[track] = *dsk_trk;
 	return (1);
 	}
 
@@ -392,60 +397,14 @@ disk_set_track(
  ****************************************************************************/
 int
 disk_set_format(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	struct format_desc		*fmt_dsc)
 
 	{
-	trk->fmt_dsc = fmt_dsc;
-	debug_error_condition(trk->fmt_dsc->set_defaults == NULL);
-	trk->fmt_dsc->set_defaults(&trk->fmt);
+	dsk_trk->fmt_dsc = fmt_dsc;
+	debug_error_condition(dsk_trk->fmt_dsc->set_defaults == NULL);
+	dsk_trk->fmt_dsc->set_defaults(&dsk_trk->fmt);
 	return (1);
-	}
-
-
-
-/****************************************************************************
- * disk_set_clock
- ****************************************************************************/
-int
-disk_set_clock(
-	struct disk_track		*trk,
-	int				clock)
-
-	{
-	if (clock == 14)      trk->fil_trk.clock = 0;
-	else if (clock == 28) trk->fil_trk.clock = 1;
-	else if (clock == 56) trk->fil_trk.clock = 2;
-	else return (0);
-	return (1);
-	}
-
-
-
-/****************************************************************************
- * disk_set_timeout_read
- ****************************************************************************/
-int
-disk_set_timeout_read(
-	struct disk_track		*trk,
-	int				timeout)
-
-	{
-	return (setvalue_ushort(&trk->fil_trk.timeout_read, timeout, CW_MIN_TIMEOUT + 1, CW_MAX_TIMEOUT - 1));
-	}
-
-
-
-/****************************************************************************
- * disk_set_timeout_write
- ****************************************************************************/
-int
-disk_set_timeout_write(
-	struct disk_track		*trk,
-	int				timeout)
-
-	{
-	return (setvalue_ushort(&trk->fil_trk.timeout_write, timeout, CW_MIN_TIMEOUT + 1, CW_MAX_TIMEOUT - 1));
 	}
 
 
@@ -455,11 +414,11 @@ disk_set_timeout_write(
  ****************************************************************************/
 int
 disk_set_indexed_read(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	int				val)
 
 	{
-	return (setvalue_uchar_bit(&trk->fil_trk.flags, val, FILE_TRACK_FLAG_INDEXED_READ));
+	return (setvalue_uchar_bit(&dsk_trk->fil_trk.flags, val, FILE_TRACK_FLAG_INDEXED_READ));
 	}
 
 
@@ -469,11 +428,11 @@ disk_set_indexed_read(
  ****************************************************************************/
 int
 disk_set_indexed_write(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	int				val)
 
 	{
-	return (setvalue_uchar_bit(&trk->fil_trk.flags, val, FILE_TRACK_FLAG_INDEXED_WRITE));
+	return (setvalue_uchar_bit(&dsk_trk->fil_trk.flags, val, FILE_TRACK_FLAG_INDEXED_WRITE));
 	}
 
 
@@ -483,11 +442,71 @@ disk_set_indexed_write(
  ****************************************************************************/
 int
 disk_set_flip_side(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	int				val)
 
 	{
-	return (setvalue_uchar_bit(&trk->fil_trk.flags, val, FILE_TRACK_FLAG_FLIP_SIDE));
+	return (setvalue_uchar_bit(&dsk_trk->fil_trk.flags, val, FILE_TRACK_FLAG_FLIP_SIDE));
+	}
+
+
+
+/****************************************************************************
+ * disk_set_clock
+ ****************************************************************************/
+int
+disk_set_clock(
+	struct disk_track		*dsk_trk,
+	int				clock)
+
+	{
+	if (clock == 14)      dsk_trk->fil_trk.clock = 0;
+	else if (clock == 28) dsk_trk->fil_trk.clock = 1;
+	else if (clock == 56) dsk_trk->fil_trk.clock = 2;
+	else return (0);
+	return (1);
+	}
+
+
+
+/****************************************************************************
+ * disk_set_side_offset
+ ****************************************************************************/
+int
+disk_set_side_offset(
+	struct disk_track		*dsk_trk,
+	int				side_offset)
+
+	{
+	return (setvalue_uchar(&dsk_trk->fil_trk.side_offset, side_offset, 0, CWTOOL_MAX_TRACK / 2));
+	}
+
+
+
+/****************************************************************************
+ * disk_set_timeout_read
+ ****************************************************************************/
+int
+disk_set_timeout_read(
+	struct disk_track		*dsk_trk,
+	int				timeout)
+
+	{
+	return (setvalue_ushort(&dsk_trk->fil_trk.timeout_read, timeout, CW_MIN_TIMEOUT + 1, CW_MAX_TIMEOUT - 1));
+	}
+
+
+
+/****************************************************************************
+ * disk_set_timeout_write
+ ****************************************************************************/
+int
+disk_set_timeout_write(
+	struct disk_track		*dsk_trk,
+	int				timeout)
+
+	{
+	return (setvalue_ushort(&dsk_trk->fil_trk.timeout_write, timeout, CW_MIN_TIMEOUT + 1, CW_MAX_TIMEOUT - 1));
 	}
 
 
@@ -497,15 +516,15 @@ disk_set_flip_side(
  ****************************************************************************/
 int
 disk_set_read_option(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	struct format_option		*fmt_opt,
 	int				num,
 	int				ofs)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->set_read_option == NULL);
-	return (trk->fmt_dsc->set_read_option(&trk->fmt, fmt_opt->magic, num, ofs));
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->set_read_option == NULL);
+	return (dsk_trk->fmt_dsc->set_read_option(&dsk_trk->fmt, fmt_opt->magic, num, ofs));
 	}
 
 
@@ -515,15 +534,15 @@ disk_set_read_option(
  ****************************************************************************/
 int
 disk_set_write_option(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	struct format_option		*fmt_opt,
 	int				num,
 	int				ofs)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->set_write_option == NULL);
-	return (trk->fmt_dsc->set_write_option(&trk->fmt, fmt_opt->magic, num, ofs));
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->set_write_option == NULL);
+	return (dsk_trk->fmt_dsc->set_write_option(&dsk_trk->fmt, fmt_opt->magic, num, ofs));
 	}
 
 
@@ -533,15 +552,15 @@ disk_set_write_option(
  ****************************************************************************/
 int
 disk_set_rw_option(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	struct format_option		*fmt_opt,
 	int				num,
 	int				ofs)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->set_rw_option == NULL);
-	return (trk->fmt_dsc->set_rw_option(&trk->fmt, fmt_opt->magic, num, ofs));
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->set_rw_option == NULL);
+	return (dsk_trk->fmt_dsc->set_rw_option(&dsk_trk->fmt, fmt_opt->magic, num, ofs));
 	}
 
 
@@ -551,14 +570,14 @@ disk_set_rw_option(
  ****************************************************************************/
 int
 disk_set_skew(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	int				skew)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->get_sectors == NULL);
-	if (trk->fmt_dsc->get_sectors(&trk->fmt) < 2) return (0);
-	return (setvalue_uchar(&trk->skew, skew, 0, CWTOOL_MAX_SECTOR - 1));
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->get_sectors == NULL);
+	if (dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt) < 2) return (0);
+	return (setvalue_uchar(&dsk_trk->skew, skew, 0, CWTOOL_MAX_SECTOR - 1));
 	}
 
 
@@ -568,14 +587,14 @@ disk_set_skew(
  ****************************************************************************/
 int
 disk_set_interleave(
-	struct disk_track		*trk,
+	struct disk_track		*dsk_trk,
 	int				interleave)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->get_sectors == NULL);
-	if (trk->fmt_dsc->get_sectors(&trk->fmt) < 2) return (0);
-	return (setvalue_uchar(&trk->interleave, interleave, 0, CWTOOL_MAX_SECTOR - 1));
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->get_sectors == NULL);
+	if (dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt) < 2) return (0);
+	return (setvalue_uchar(&dsk_trk->interleave, interleave, 0, CWTOOL_MAX_SECTOR - 1));
 	}
 
 
@@ -585,12 +604,12 @@ disk_set_interleave(
  ****************************************************************************/
 int
 disk_set_sector_number(
-	struct disk_sector		*sct,
+	struct disk_sector		*dsk_sct,
 	int				number)
 
 	{
 	debug_error_condition((number < 0) || (number >= CWTOOL_MAX_SECTOR));
-	sct->number = number;
+	dsk_sct->number = number;
 	return (0);
 	}
 
@@ -601,10 +620,10 @@ disk_set_sector_number(
  ****************************************************************************/
 int
 disk_get_sector_number(
-	struct disk_sector		*sct)
+	struct disk_sector		*dsk_sct)
 
 	{
-	return (sct->number);
+	return (dsk_sct->number);
 	}
 
 
@@ -614,12 +633,12 @@ disk_get_sector_number(
  ****************************************************************************/
 int
 disk_get_sectors(
-	struct disk_track		*trk)
+	struct disk_track		*dsk_trk)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->get_sectors == NULL);
-	return (trk->fmt_dsc->get_sectors(&trk->fmt));
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->get_sectors == NULL);
+	return (dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt));
 	}
 
 
@@ -672,11 +691,11 @@ disk_get_info(
  ****************************************************************************/
 struct format_desc *
 disk_get_format(
-	struct disk_track		*trk)
+	struct disk_track		*dsk_trk)
 
 	{
-	debug_error_condition(trk == NULL);
-	return (trk->fmt_dsc);
+	debug_error_condition(dsk_trk == NULL);
+	return (dsk_trk->fmt_dsc);
 	}
 
 
@@ -686,12 +705,12 @@ disk_get_format(
  ****************************************************************************/
 struct format_option *
 disk_get_read_options(
-	struct disk_track		*trk)
+	struct disk_track		*dsk_trk)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->fmt_opt_rd == NULL);
-	return (trk->fmt_dsc->fmt_opt_rd);
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->fmt_opt_rd == NULL);
+	return (dsk_trk->fmt_dsc->fmt_opt_rd);
 	}
 
 
@@ -701,12 +720,12 @@ disk_get_read_options(
  ****************************************************************************/
 struct format_option *
 disk_get_write_options(
-	struct disk_track		*trk)
+	struct disk_track		*dsk_trk)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->fmt_opt_wr == NULL);
-	return (trk->fmt_dsc->fmt_opt_wr);
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->fmt_opt_wr == NULL);
+	return (dsk_trk->fmt_dsc->fmt_opt_wr);
 	}
 
 
@@ -716,12 +735,12 @@ disk_get_write_options(
  ****************************************************************************/
 struct format_option *
 disk_get_rw_options(
-	struct disk_track		*trk)
+	struct disk_track		*dsk_trk)
 
 	{
-	debug_error_condition(trk->fmt_dsc == NULL);
-	debug_error_condition(trk->fmt_dsc->fmt_opt_rw == NULL);
-	return (trk->fmt_dsc->fmt_opt_rw);
+	debug_error_condition(dsk_trk->fmt_dsc == NULL);
+	debug_error_condition(dsk_trk->fmt_dsc->fmt_opt_rw == NULL);
+	return (dsk_trk->fmt_dsc->fmt_opt_rw);
 	}
 
 
@@ -731,15 +750,15 @@ disk_get_rw_options(
  ****************************************************************************/
 int
 disk_sector_read(
-	struct disk_sector		*sct,
-	struct disk_error		*err,
+	struct disk_sector		*dsk_sct,
+	struct disk_error		*dsk_err,
 	unsigned char			*data)
 
 	{
-	if (((sct->err.errors == err->errors) && (sct->err.warnings < err->warnings)) ||
-		(sct->err.errors < err->errors)) return (0);
-	sct->err = *err;
-	if (data != NULL) disk_sector_do_copy(sct->data, data, sct->size);
+	if (((dsk_sct->err.errors == dsk_err->errors) && (dsk_sct->err.warnings < dsk_err->warnings)) ||
+		(dsk_sct->err.errors < dsk_err->errors)) return (0);
+	dsk_sct->err = *dsk_err;
+	if (data != NULL) disk_sector_do_copy(dsk_sct->data, data, dsk_sct->size);
 	return (1);
 	}
 
@@ -751,10 +770,10 @@ disk_sector_read(
 int
 disk_sector_write(
 	unsigned char			*data,
-	struct disk_sector		*sct)
+	struct disk_sector		*dsk_sct)
 
 	{
-	disk_sector_do_copy(data, sct->data, sct->size);
+	disk_sector_do_copy(data, dsk_sct->data, dsk_sct->size);
 	return (1);
 	}
 
@@ -784,15 +803,15 @@ disk_statistics(
 
 	for (t = 0; t < CWTOOL_MAX_TRACK; t++)
 		{
-		struct disk_track	*trk = &dsk->trk[t];
+		struct disk_track	*dsk_trk = &dsk->trk[t];
 		unsigned char		data[CWTOOL_MAX_TRACK_SIZE] = { };
 		struct fifo		ffo = FIFO_INIT(data, sizeof (data));
 
-		if (trk->fmt_dsc == NULL) continue;
-		debug_error_condition(trk->fmt_dsc->track_statistics == NULL);
+		if (dsk_trk->fmt_dsc == NULL) continue;
+		debug_error_condition(dsk_trk->fmt_dsc->track_statistics == NULL);
 
-		dsk->fil_img_l0->track_read(&fil, &ffo, &trk->fil_trk, t);
-		trk->fmt_dsc->track_statistics(&trk->fmt, &ffo, t);
+		dsk->fil_img_l0->track_read(&fil, &ffo, &dsk_trk->fil_trk, t);
+		dsk_trk->fmt_dsc->track_statistics(&dsk_trk->fmt, &ffo, t);
 		}
 
 	/* close file */
@@ -812,14 +831,14 @@ disk_statistics(
 int
 disk_read(
 	struct disk			*dsk,
-	struct disk_option		*opt,
+	struct disk_option		*dsk_opt,
 	const char			*file_src,
 	const char			*file_dst)
 
 	{
 	struct disk_info		dsk_nfo = { };
 	struct file			fil_src, fil_dst;
-	int				t, retry = opt->retry;
+	int				t, retry = dsk_opt->retry;
 
 	debug_error_condition(dsk->fil_img_l0->open == NULL);
 	debug_error_condition(dsk->fil_img_l0->close == NULL);
@@ -842,31 +861,31 @@ disk_read(
 
 	for (t = 0; t < CWTOOL_MAX_TRACK; t++)
 		{
-		struct disk_track	*trk = &dsk->trk[t];
-		struct disk_sector	sct[CWTOOL_MAX_SECTOR] = { };
+		struct disk_track	*dsk_trk = &dsk->trk[t];
+		struct disk_sector	dsk_sct[CWTOOL_MAX_SECTOR] = { };
 		unsigned char		data_src[CWTOOL_MAX_TRACK_SIZE] = { };
 		unsigned char		data_dst[CWTOOL_MAX_TRACK_SIZE] = { };
 		struct fifo		ffo_src = FIFO_INIT(data_src, sizeof (data_src));
 		struct fifo		ffo_dst = FIFO_INIT(data_dst, sizeof (data_dst));
 		int			try;
 
-		if (trk->fmt_dsc == NULL) continue;
-		debug_error_condition(trk->fmt_dsc->track_read == NULL);
+		if (dsk_trk->fmt_dsc == NULL) continue;
+		if (disk_sectors_init(dsk_sct, dsk_trk, &ffo_dst, 0) == 0) continue;
+		debug_error_condition(dsk_trk->fmt_dsc->track_read == NULL);
 
-		disk_sectors_init(sct, trk, &ffo_dst, 0);
 		for (try = 0; try <= retry; try++)
 			{
 			fifo_reset(&ffo_src);
-			dsk->fil_img_l0->track_read(&fil_src, &ffo_src, &trk->fil_trk, t);
-			trk->fmt_dsc->track_read(&trk->fmt, &ffo_src, &ffo_dst, sct, t);
-			disk_info_update(&dsk_nfo, sct, t, trk->fmt_dsc->get_sectors(&trk->fmt), try, 0);
-			if (opt->info_func != NULL) opt->info_func(&dsk_nfo, 0);
+			dsk->fil_img_l0->track_read(&fil_src, &ffo_src, &dsk_trk->fil_trk, t);
+			dsk_trk->fmt_dsc->track_read(&dsk_trk->fmt, &ffo_src, &ffo_dst, dsk_sct, t);
+			disk_info_update(&dsk_nfo, dsk_sct, t, dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt), try, 0);
+			if (dsk_opt->info_func != NULL) dsk_opt->info_func(&dsk_nfo, 0);
 			if (dsk_nfo.sectors_bad == 0) break;
 			}
-		disk_info_update(&dsk_nfo, sct, t, trk->fmt_dsc->get_sectors(&trk->fmt), try, 1);
-		dsk->fil_img->track_write(&fil_dst, &ffo_dst, &trk->fil_trk, t);
+		disk_info_update(&dsk_nfo, dsk_sct, t, dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt), try, 1);
+		dsk->fil_img->track_write(&fil_dst, &ffo_dst, &dsk_trk->fil_trk, t);
 		}
-	if (opt->info_func != NULL) opt->info_func(&dsk_nfo, 1);
+	if (dsk_opt->info_func != NULL) dsk_opt->info_func(&dsk_nfo, 1);
 
 	/* close files */
 
@@ -886,13 +905,14 @@ disk_read(
 int
 disk_write(
 	struct disk			*dsk,
-	struct disk_option		*opt,
+	struct disk_option		*dsk_opt,
 	const char			*file_src,
 	const char			*file_dst)
 
 	{
 	struct disk_info		dsk_nfo = { };
 	struct file			fil_src, fil_dst;
+	int				mode = (dsk_opt->flags & DISK_OPTION_FLAG_IGNORE_SIZE) ? FILE_MODE_READ2 : FILE_MODE_READ;
 	int				t;
 
 	debug_error_condition(dsk->fil_img->open == NULL);
@@ -904,32 +924,32 @@ disk_write(
 
 	/* open files */
 
-	dsk->fil_img->open(&fil_src, file_src, FILE_MODE_READ);
+	dsk->fil_img->open(&fil_src, file_src, mode);
 	dsk->fil_img_l0->open(&fil_dst, file_dst, FILE_MODE_WRITE);
 
 	/* iterate over all defined tracks */
 
 	for (t = 0; t < CWTOOL_MAX_TRACK; t++)
 		{
-		struct disk_track	*trk = &dsk->trk[t];
-		struct disk_sector	sct[CWTOOL_MAX_SECTOR] = { };
+		struct disk_track	*dsk_trk = &dsk->trk[t];
+		struct disk_sector	dsk_sct[CWTOOL_MAX_SECTOR] = { };
 		unsigned char		data_src[CWTOOL_MAX_TRACK_SIZE] = { };
 		unsigned char		data_dst[CWTOOL_MAX_TRACK_SIZE] = { };
 		struct fifo		ffo_src = FIFO_INIT(data_src, sizeof (data_src));
 		struct fifo		ffo_dst = FIFO_INIT(data_dst, sizeof (data_dst));
 
-		if (trk->fmt_dsc == NULL) continue;
-		debug_error_condition(trk->fmt_dsc->track_write == NULL);
+		if (dsk_trk->fmt_dsc == NULL) continue;
+		disk_sectors_init(dsk_sct, dsk_trk, &ffo_src, 1);
+		debug_error_condition(dsk_trk->fmt_dsc->track_write == NULL);
 
-		disk_sectors_init(sct, trk, &ffo_src, 1);
-		dsk->fil_img->track_read(&fil_src, &ffo_src, &trk->fil_trk, t);
-		if (! trk->fmt_dsc->track_write(&trk->fmt, &ffo_src, sct, &ffo_dst, t)) error("data too long on track %d", t);
+		dsk->fil_img->track_read(&fil_src, &ffo_src, &dsk_trk->fil_trk, t);
+		if (! dsk_trk->fmt_dsc->track_write(&dsk_trk->fmt, &ffo_src, dsk_sct, &ffo_dst, t)) error("data too long on track %d", t);
 		fifo_set_rd_ofs(&ffo_src, fifo_get_wr_ofs(&ffo_src));
-		dsk->fil_img_l0->track_write(&fil_dst, &ffo_dst, &trk->fil_trk, t);
-		disk_info_update(&dsk_nfo, sct, t, trk->fmt_dsc->get_sectors(&trk->fmt), 0, 1);
-		if (opt->info_func != NULL) opt->info_func(&dsk_nfo, 0);
+		dsk->fil_img_l0->track_write(&fil_dst, &ffo_dst, &dsk_trk->fil_trk, t);
+		disk_info_update(&dsk_nfo, dsk_sct, t, dsk_trk->fmt_dsc->get_sectors(&dsk_trk->fmt), 0, 1);
+		if (dsk_opt->info_func != NULL) dsk_opt->info_func(&dsk_nfo, 0);
 		}
-	if (opt->info_func != NULL) opt->info_func(&dsk_nfo, 1);
+	if (dsk_opt->info_func != NULL) dsk_opt->info_func(&dsk_nfo, 1);
 
 	/* close files */
 

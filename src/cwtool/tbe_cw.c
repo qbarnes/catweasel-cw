@@ -511,6 +511,7 @@ tbe_cw_statistics(
 
 	{
 	raw_histogram(ffo_l0, track);
+	raw_precomp_statistics(ffo_l0, fmt->tbe_cw.rw.bnd, 6);
 	return (1);
 	}
 

@@ -489,7 +489,7 @@ raw_histogram(
 	int				track)
 
 	{
-	char				*data = fifo_get_data(ffo);
+	unsigned char			*data = fifo_get_data(ffo);
 	int				size = fifo_get_wr_ofs(ffo);
 
 	if (verbose_level >= -1) return (raw_histogram_long(data, size, track));
@@ -508,7 +508,7 @@ raw_precomp_statistics(
 	int				bnd_size)
 
 	{
-	char				*data = fifo_get_data(ffo);
+	unsigned char			*data = fifo_get_data(ffo);
 	int				size = fifo_get_wr_ofs(ffo);
 	int				c1, c2, d1, d2, i, j, lookup[128];
 	int				sum1[8][8] = { }, sum2[8][8] = { }, count[8][8] = { };
@@ -530,7 +530,7 @@ raw_precomp_statistics(
 
 	for (i = 0, c1 = -1, d1 = 0; i < size; i++, c1 = c2, d1 = d2)
 		{
-		d2 = data[i] & 127;
+		d2 = data[i] & 0x7f;
 		c2 = lookup[d2];
 		if ((c1 == -1) || (c2 == -1)) continue;
 		sum1[c1][c2] += d1;

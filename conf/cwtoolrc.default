@@ -31,21 +31,29 @@ disk "raw_56"
 disk "c1541"
 	{
 	info "C1541, GCR, 5.25 inch, 35 trks, 1 side, 17-21 sec/trk, 170 K"
+	format "fill"
+	track_range 2 138 4 write fill_length 16384
 	format "gcr_cbm"
 	clock 14
 	read timeout 180
 	write
 		{
 		timeout 300
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
 		prolog_length 2048
 		}
 	track_range 0 64 4
 		{
 		bounds
 			{
-			0x0800 0x1400 0x1c00
-			0x1d00 0x2500 0x2c00
-			0x2d00 0x3800 0x4000
+			0x0800 0x1300 0x1c00
+			0x1d00 0x2600 0x2f00
+			0x3000 0x3900 0x5000
 			}
 		sectors 21
 		}
@@ -53,9 +61,9 @@ disk "c1541"
 		{
 		bounds
 			{
-			0x0800 0x1600 0x1e00
-			0x1f00 0x2800 0x3200
-			0x3300 0x3d00 0x4800
+			0x0800 0x1500 0x1f00
+			0x2000 0x2a00 0x3400
+			0x3500 0x3f00 0x5000
 			}
 		sectors 19
 		}
@@ -63,9 +71,9 @@ disk "c1541"
 		{
 		bounds
 			{
-			0x0800 0x1700 0x2000
-			0x2100 0x2b00 0x3400
-			0x3500 0x4200 0x5000
+			0x0800 0x1600 0x2000
+			0x2100 0x2c00 0x3700
+			0x3800 0x4200 0x5000
 			}
 		sectors 18
 		}
@@ -73,9 +81,9 @@ disk "c1541"
 		{
 		bounds
 			{
-			0x0800 0x1900 0x2200
+			0x0800 0x1700 0x2200
 			0x2300 0x2e00 0x3900
-			0x3a00 0x4700 0x5800
+			0x3a00 0x4500 0x5000
 			}
 		sectors 17
 		}
@@ -89,71 +97,136 @@ disk "c1541_40"
 		{
 		bounds
 			{
-			0x0800 0x1900 0x2200
+			0x0800 0x1700 0x2200
 			0x2300 0x2e00 0x3900
-			0x3a00 0x4700 0x5800
+			0x3a00 0x4500 0x5000
 			}
 		sectors 17
 		}
+	format "fill"
+	track_range 142 158 4 write fill_length 16384
 	}
 
 disk "c1571"
 	{
 #	info "C1571, GCR, 5.25 inch, 35 trks, 2 sides, 17-21 sec/trk, 341 K"
 	info "C1571, GCR, 5.25 inch, 35 trks, 2 sides, *** UNTESTED ***"
+	side_offset 70
+	format "fill"
+	write fill_length 16384
+	track_range 1 139 2 { }
 	format "gcr_cbm"
 	clock 14
+	track_step 2
 	read timeout 180
 	write
 		{
 		timeout 300
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
 		prolog_length 2048
 		}
 	bounds
 		{
-		0x0800 0x1400 0x1c00
-		0x1d00 0x2500 0x2c00
-		0x2d00 0x3800 0x4000
+		0x0800 0x1300 0x1c00
+		0x1d00 0x2600 0x2f00
+		0x3000 0x3900 0x5000
 		}
 	sectors 21
-	track_range 0 64 4 { }
-	track_range 1 65 4 { }
+	track_range 0 32 2 { }
+	track_range 70 102 2 { }
 	bounds
 		{
-		0x0800 0x1600 0x1e00
-		0x1f00 0x2800 0x3200
-		0x3300 0x3d00 0x4800
+		0x0800 0x1500 0x1f00
+		0x2000 0x2a00 0x3400
+		0x3500 0x3f00 0x5000
 		}
 	sectors 19
-	track_range 68 92 4 { }
-	track_range 69 93 4 { }
+	track_range 34 46 2 { }
+	track_range 104 116 2 { }
 	bounds
 		{
-		0x0800 0x1700 0x2000
-		0x2100 0x2b00 0x3400
-		0x3500 0x4200 0x5000
+		0x0800 0x1600 0x2000
+		0x2100 0x2c00 0x3700
+		0x3800 0x4200 0x5000
 		}
 	sectors 18
-	track_range 96 116 4 { }
-	track_range 97 117 4 { }
+	track_range 48 58 2 { }
+	track_range 118 128 2 { }
 	bounds
 		{
-		0x0800 0x1900 0x2200
+		0x0800 0x1700 0x2200
 		0x2300 0x2e00 0x3900
-		0x3a00 0x4700 0x5800
+		0x3a00 0x4500 0x5000
 		}
 	sectors 17
-	track_range 120 136 4 { }
-	track_range 121 137 4 { }
+	track_range 60 68 2 { }
+	track_range 130 138 2 { }
 	}
 
 disk "c1571_40"
 	{
 #	info "C1571, GCR, 5.25 inch, 40 trks, 2 sides, 17-21 sec/trk, 384 K"
 	info "C1571, GCR, 5.25 inch, 40 trks, 2 sides, *** UNTESTED ***"
-	copy "c1571"
-	track_range 140 156 4 { }
-	track_range 141 157 4 { }
+	side_offset 80
+	format "fill"
+	write fill_length 16384
+	track_range 1 159 2 { }
+	format "gcr_cbm"
+	clock 14
+	track_step 2
+	read timeout 180
+	write
+		{
+		timeout 300
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		prolog_length 2048
+		}
+	bounds
+		{
+		0x0800 0x1300 0x1c00
+		0x1d00 0x2600 0x2f00
+		0x3000 0x3900 0x5000
+		}
+	sectors 21
+	track_range 0 32 2 { }
+	track_range 80 112 2 { }
+	bounds
+		{
+		0x0800 0x1500 0x1f00
+		0x2000 0x2a00 0x3400
+		0x3500 0x3f00 0x5000
+		}
+	sectors 19
+	track_range 34 46 2 { }
+	track_range 114 126 2 { }
+	bounds
+		{
+		0x0800 0x1600 0x2000
+		0x2100 0x2c00 0x3700
+		0x3800 0x4200 0x5000
+		}
+	sectors 18
+	track_range 48 58 2 { }
+	track_range 128 138 2 { }
+	bounds
+		{
+		0x0800 0x1700 0x2200
+		0x2300 0x2e00 0x3900
+		0x3a00 0x4500 0x5000
+		}
+	sectors 17
+	track_range 60 78 2 { }
+	track_range 140 158 2 { }
 	}
 
 disk "c1581_dd"
@@ -185,17 +258,16 @@ disk "amiga_dd"
 	clock 14
 	sectors 11
 	read timeout 230
-	write
+	track_range 0 159 1 write
 		{
 		timeout 300
 		prolog_length 1024
-		}
-	track_range 0 79 1 { }
-	track_range 80 159 1 write precomp
-		{
-		+0x0000 +0x0100 +0x0100
-		-0x0100 +0x0000 +0x0000
-		-0x0100 +0x0000 +0x0000
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
 		}
 	}
 
@@ -206,17 +278,16 @@ disk "amiga_hd"
 	clock 28
 	sectors 22
 	read timeout 215
-	write
+	track_range 0 159 1 write
 		{
 		timeout 300
 		prolog_length 2048
-		}
-	track_range 0 79 1 { }
-	track_range 80 159 1 write precomp
-		{
-		+0x0000 +0x0100 +0x0100
-		-0x0100 +0x0000 +0x0000
-		-0x0100 +0x0000 +0x0000
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
 		}
 	}
 

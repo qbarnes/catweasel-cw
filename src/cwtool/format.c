@@ -27,6 +27,7 @@ extern struct format_desc		fm_nec765_format_desc;
 extern struct format_desc		mfm_nec765_format_desc;
 extern struct format_desc		mfm_amiga_format_desc;
 extern struct format_desc		tbe_cw_format_desc;
+extern struct format_desc		fill_format_desc;
 static struct format_desc		*fmt_dsc[] =
 	{
 	&raw_format_desc,
@@ -36,6 +37,7 @@ static struct format_desc		*fmt_dsc[] =
 	&mfm_nec765_format_desc,
 	&mfm_amiga_format_desc,
 	&tbe_cw_format_desc,
+	&fill_format_desc,
 	NULL
 	};
 
