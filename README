@@ -34,9 +34,15 @@ source of your running kernel in order to compile the driver module. cw was
 tested on x86 under different distributions with different Linux kernel
 versions (to name a few: 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 all directly
 taken from http://www.kernel.org/), it also succesfully compiled on
-Knoppix 4.0.2, SuSE 10.0 - 10.3, 11.1, 11.2, Ubuntu 10.10 (x64) and
-Debian 6.0. There were also reports, that cw runs on PowerPC platforms
-under Linux without problems.
+Knoppix 4.0.2, SuSE 10.0 - 10.3, 11.1, 11.2, Ubuntu 10.10 (x86_64), Debian 6.0
+and Ubuntu 13.04 (x86_64). There were also reports, that cw runs on PowerPC
+platforms under Linux without problems.
+
+In case you use another Unix-like operating system like *BSD, you may still
+compile cwtool stand-alone. If 'uname' does not return Linux, the compilation
+of the driver will be disabled automatically. If you use OSX, please look
+also under [4] for further instructions. With the help of Cygwin you may
+also compile cwtool under Windows.
 
 You may build cwtool with dietlibc, just set and export the environment
 variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
@@ -184,6 +190,21 @@ NOTE: You may use 'make uninstall' to uninstall cw, the parameters of
 2) If you want to use the kernel driver of cw for your own programs please
    have a look at the src/cwio directory.
 
+3) Compiling on OSX is possible. Normally cwtool will be build stand-alone.
+   To build cwtool with support for the catweasel-osx driver, use
+   # make CATWEASEL_OSX=1
+   If needed adapt the paths in Makefile.conf beforehand. The driver model
+   is of course completely different than the Linux standard. The
+   Sourceforge project catweasel-osx (http://catweasel-osx.sourceforge.net)
+   creates a companion PCI Catweasel driver that cwtool will connect to. If
+   you check out catweasel-osx and cw projects as peers in your file system,
+   you can first build and install catweasel-osx and then build cwtool which
+   will connect to it. cwtool can use up to two PCI Catweasel MK3 or MK4
+   cards, with up to two drives connected to each. The device driver "names"
+   are Cat0d0/Cat0d1 for the first Catweasel card and first and second
+   drives, respectively; and Cat1d0/Cat1d1 for the second Catweasel and its
+   first and second drives.
+
 
   ====================
   [5] RELATED PROJECTS
@@ -251,3 +272,7 @@ https://github.com/balr0g/cw/
 	A patched version of cw-0.13 with additional disk formats and
 	compile time fixes for cwtool for Mac OS X. Current versions of
 	cw include this.
+
+http://sourceforge.net/projects/catweasel-osx/files/cwtools-diffs/
+	A patched version of cw-0.13 with support for OSX. Current versions
+	of cw include this.

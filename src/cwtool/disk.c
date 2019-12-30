@@ -448,8 +448,8 @@ disk_track_read_greedy(
 	struct trackmap_entry		*trm_ent;
 	struct disk_track		*dsk_trk;
 	struct disk_sector		dsk_sct[GLOBAL_NR_SECTORS] = { };
-	unsigned char			data_src[GLOBAL_MAX_TRACK_SIZE] = { };
-	unsigned char			data_dst[GLOBAL_MAX_TRACK_SIZE] = { };
+	unsigned char			data_src[GLOBAL_MAX_TRACK_SIZE] = { 0, };
+	unsigned char			data_dst[GLOBAL_MAX_TRACK_SIZE] = { 0, };
 	struct container		*con;
 	struct fifo			ffo_src = FIFO_INIT(data_src, sizeof (data_src));
 	struct fifo			ffo_dst = FIFO_INIT(data_dst, sizeof (data_dst));

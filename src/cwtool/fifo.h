@@ -27,7 +27,7 @@
 
 
 
-#define FIFO_INIT(d, s)			(struct fifo) { .data = d, .size = s, .limit = s }
+#define FIFO_INIT(d, s)			(struct fifo) { .data = d, .size = s, .limit = s, .wr_ofs = 0, .wr_bitofs = 0, .rd_ofs = 0, .rd_bitofs = 0, .reg = 0, .flags = 0, .speed = 0  }
 
 /* writable in the sense of "writable to a catweasel device" */
 

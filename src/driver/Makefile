@@ -13,7 +13,9 @@ ifneq (${KERNELRELEASE},)
 EXTRA_CFLAGS:=${DEBUG} -I${CW_DIR}/../include
 obj-m:=cw.o
 cw-y:=${OBJECTS}
-else
+
+else # KERNELRELEASE
+
 PREFIX:=../..
 include ${PREFIX}/Makefile.conf
 
@@ -21,13 +23,15 @@ TARGET24:=${BUILD_MODULE_DIR}/cw.o
 TARGET26:=${BUILD_MODULE_DIR}/cw.ko
 
 KERNEL_DIR:=/lib/modules/${shell uname -r}/build
-VERSION:=${shell uname -r | awk 'BEGIN { FS="."; } { print($$1 $$2); }'}
+VERSION:=${shell uname -r | sed 's/-.*$$//' | awk 'BEGIN { FS="."; } { print($$1 $$2); }'}
 INCLUDE:=-I${KERNEL_DIR}/include -I${BUILD_INCLUDE_DIR}
 CWD:=${shell pwd}
 CC:=gcc -Wall -O2 -D__KERNEL__ -DMODULE ${DEBUG} ${INCLUDE}
 LD:=ld -r -s
 
 .PHONY: all linux24 linux26 clean
+
+ifndef STANDALONE
 
 all:
 	if [ ${VERSION} -ge 26 ]; then ${MAKE} linux26; else ${MAKE} linux24; fi
@@ -52,4 +56,5 @@ ${TARGET24}: ${OBJECTS}
 clean:
 	if [ ${VERSION} -ge 26 ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
 	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} ${BUILD_BIN_DIR}/fwdump config.h firmware.c *~ *.bak *.ko Module.symvers Modules.symvers Module.markers modules.order
-endif
+endif # STANDALONE
+endif # KERNELRELEASE

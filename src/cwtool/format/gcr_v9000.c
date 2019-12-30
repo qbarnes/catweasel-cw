@@ -816,7 +816,7 @@ static struct format_option		gcr_v9000_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_data_id",         MAGIC_IGNORE_DATA_ID,         1),
 	FORMAT_OPTION_BOOLEAN("match_simple",           MAGIC_MATCH_SIMPLE,           1),
 	FORMAT_OPTION_BOOLEAN("match_simple_fixup",     MAGIC_MATCH_SIMPLE_FIXUP,     1),
-	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",               MAGIC_POSTCOMP_SIMPLE,        1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",        MAGIC_POSTCOMP_SIMPLE,        1),
 	FORMAT_OPTION_BOOLEAN("postcomp_simple",        MAGIC_POSTCOMP_SIMPLE,        1),
 	FORMAT_OPTION_INTEGER("postcomp_simple_adjust", MAGIC_POSTCOMP_SIMPLE_ADJUST, 2),
 	FORMAT_OPTION_END
@@ -845,14 +845,14 @@ static struct format_option		gcr_v9000_write_options[] =
  ****************************************************************************/
 static struct format_option		gcr_v9000_rw_options[] =
 	{
-	FORMAT_OPTION_INTEGER("sectors",           MAGIC_SECTORS,       1),
-	FORMAT_OPTION_INTEGER("header_id",         MAGIC_HEADER_ID,     1),
-	FORMAT_OPTION_INTEGER("data_id",           MAGIC_DATA_ID,       1),
+	FORMAT_OPTION_INTEGER("sectors",                    MAGIC_SECTORS,       1),
+	FORMAT_OPTION_INTEGER("header_id",                  MAGIC_HEADER_ID,     1),
+	FORMAT_OPTION_INTEGER("data_id",                    MAGIC_DATA_ID,       1),
 	FORMAT_OPTION_BOOLEAN_OBSOLETE("flip_track_id",     MAGIC_FLIP_TRACK_ID, 1),
 	FORMAT_OPTION_INTEGER_OBSOLETE("side_offset_v9000", MAGIC_SIDE_OFFSET,   1),
-	FORMAT_OPTION_INTEGER_COMPAT("bounds",            MAGIC_BOUNDS_OLD,    9),
-	FORMAT_OPTION_INTEGER("bounds_old",        MAGIC_BOUNDS_OLD,    9),
-	FORMAT_OPTION_INTEGER("bounds_new",        MAGIC_BOUNDS_NEW,    9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",              MAGIC_BOUNDS_OLD,    9),
+	FORMAT_OPTION_INTEGER("bounds_old",                 MAGIC_BOUNDS_OLD,    9),
+	FORMAT_OPTION_INTEGER("bounds_new",                 MAGIC_BOUNDS_NEW,    9),
 	FORMAT_OPTION_END
 	};
 

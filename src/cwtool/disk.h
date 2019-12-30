@@ -18,7 +18,7 @@
 #include "image.h"
 #include "format.h"
 
-#define DISK_TRACK_INIT			(struct disk_track) { .img_trk = IMAGE_TRACK_INIT(CW_DEFAULT_TIMEOUT) }
+#define DISK_TRACK_INIT			(struct disk_track) { .skew = 0, .interleave = 0, .reserved = { 0, }, .img_trk = IMAGE_TRACK_INIT(CW_DEFAULT_TIMEOUT), .fmt_dsc = 0 }
 
 struct disk_track
 	{
@@ -30,7 +30,7 @@ struct disk_track
 	union format			fmt;
 	};
 
-#define DISK_INIT(r)			(struct disk) { .revision = r }
+#define DISK_INIT(r)			(struct disk) { .revision = r, .name = { 0, }, .info = { 0, }, .size = 0 }
 
 struct trackmap;
 

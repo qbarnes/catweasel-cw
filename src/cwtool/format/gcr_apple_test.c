@@ -1238,7 +1238,7 @@ static struct format_option		gcr_apple_test_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_volume_id",      MAGIC_IGNORE_VOLUME_ID,      1),
 	FORMAT_OPTION_BOOLEAN("match_simple",          MAGIC_MATCH_SIMPLE,          1),
 	FORMAT_OPTION_BOOLEAN("match_simple_fixup",    MAGIC_MATCH_SIMPLE_FIXUP,    1),
-	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",              MAGIC_POSTCOMP_SIMPLE,       1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_BOOLEAN("postcomp_simple",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_INTEGER("dump_sector",           MAGIC_DUMP_SECTOR,           1),
 	FORMAT_OPTION_END
@@ -1266,15 +1266,15 @@ static struct format_option		gcr_apple_test_write_options[] =
  ****************************************************************************/
 static struct format_option		gcr_apple_test_rw_options[] =
 	{
-	FORMAT_OPTION_INTEGER("sectors",     MAGIC_SECTORS,     1),
-	FORMAT_OPTION_INTEGER("volume_id",   MAGIC_VOLUME_ID,   1),
-	FORMAT_OPTION_INTEGER("mode",        MAGIC_MODE,        1),
-	FORMAT_OPTION_INTEGER("sync_value1", MAGIC_SYNC_VALUE1, 1),
-	FORMAT_OPTION_INTEGER("sync_value2", MAGIC_SYNC_VALUE2, 1),
+	FORMAT_OPTION_INTEGER("sectors",              MAGIC_SECTORS,     1),
+	FORMAT_OPTION_INTEGER("volume_id",            MAGIC_VOLUME_ID,   1),
+	FORMAT_OPTION_INTEGER("mode",                 MAGIC_MODE,        1),
+	FORMAT_OPTION_INTEGER("sync_value1",          MAGIC_SYNC_VALUE1, 1),
+	FORMAT_OPTION_INTEGER("sync_value2",          MAGIC_SYNC_VALUE2, 1),
 	FORMAT_OPTION_INTEGER_OBSOLETE("track_step",  MAGIC_TRACK_STEP,  1),
-	FORMAT_OPTION_INTEGER_COMPAT("bounds",      MAGIC_BOUNDS_OLD,  9),
-	FORMAT_OPTION_INTEGER("bounds_old",  MAGIC_BOUNDS_OLD,  9),
-	FORMAT_OPTION_INTEGER("bounds_new",  MAGIC_BOUNDS_NEW,  9),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",        MAGIC_BOUNDS_OLD,  9),
+	FORMAT_OPTION_INTEGER("bounds_old",           MAGIC_BOUNDS_OLD,  9),
+	FORMAT_OPTION_INTEGER("bounds_new",           MAGIC_BOUNDS_NEW,  9),
 	FORMAT_OPTION_END
 	};
 

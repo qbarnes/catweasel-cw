@@ -27,6 +27,9 @@
 #include "../export.h"
 #include "../parse.h"
 #include "../string.h"
+#ifdef CW_CATWEASEL_OSX
+#include "../osx/cwmac.h"
+#endif /* CW_CATWEASEL_OSX */
 
 
 
@@ -161,7 +164,11 @@ image_raw_ioctl(
 	if (tri.track >= img_raw->fli.nr_tracks) error_message("error while accessing track %d, track is not supported by device '%s'", track, file_get_path(&img_raw->fil[0]));
 	if (tri.side  >= img_raw->fli.nr_sides)  error_message("error while accessing track %d, side is not supported by device '%s'", track, file_get_path(&img_raw->fil[0]));
 	if (tri.mode  >= img_raw->fli.nr_modes)  error_message("error while accessing track %d, mode is not supported by device '%s'", track, file_get_path(&img_raw->fil[0]));
+#ifdef CW_CATWEASEL_OSX
+	result = cwmac_ioctl(cmd, (cw_ptr_t) &tri, FILE_FLAG_NONE, img_raw->osx_c, img_raw->osx_drive);
+#else /* CW_CATWEASEL_OSX */
 	result = file_ioctl(&img_raw->fil[0], cmd, &tri, FILE_FLAG_NONE);
+#endif /* CW_CATWEASEL_OSX */
 done:
 	return (result);
 	}
@@ -718,6 +725,29 @@ image_raw_write_flags(
 
 
 
+/****************************************************************************
+ * image_raw_close_read_remaining
+ ****************************************************************************/
+static void
+image_raw_close_read_remaining(
+	union image			*img)
+
+	{
+	struct track_header		trk_hdr;
+	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
+	struct fifo			ffo = FIFO_INIT(data, sizeof (data));
+
+	/* read remaining data if we have a pipe to prevent "broken pipe" */
+
+	if ((file_is_readable(&img->raw.fil[0])) && (img->raw.type == TYPE_PIPE))
+		{
+		while (image_raw_read_track2(&img->raw, &img->raw.fil[0], NULL, &trk_hdr, &ffo, img->raw.subtype) > 0) ;
+		file_close(&img->raw.fil[1]);
+		}
+	}
+
+
+
 
 /****************************************************************************
  *
@@ -739,10 +769,10 @@ image_raw_open(
 	int				flags)
 
 	{
-	static const char		magic_data[MAGIC_SIZE]  = "cwtool raw data";
-	static const char		magic_data2[MAGIC_SIZE] = "cwtool raw data 2";
-	static const char		magic_data3[MAGIC_SIZE] = "cwtool raw data 3";
-	static const char		magic_text3[MAGIC_SIZE] = "# cwtool raw text 3\n";
+	static const char		magic_data[MAGIC_SIZE]  = { 'c', 'w', 't', 'o', 'o', 'l', ' ', 'r', 'a', 'w', ' ', 'd', 'a', 't', 'a', 0, };
+	static const char		magic_data2[MAGIC_SIZE] = { 'c', 'w', 't', 'o', 'o', 'l', ' ', 'r', 'a', 'w', ' ', 'd', 'a', 't', 'a', ' ', '2', 0, };
+	static const char		magic_data3[MAGIC_SIZE] = { 'c', 'w', 't', 'o', 'o', 'l', ' ', 'r', 'a', 'w', ' ', 'd', 'a', 't', 'a', ' ', '3', 0, };
+	static const char		magic_text3[MAGIC_SIZE] = { '#', ' ', 'c', 'w', 't', 'o', 'o', 'l', ' ', 'r', 'a', 'w', ' ', 't', 'e', 'x', 't', ' ', '3', '\n', 0, };
 	char				buffer[MAGIC_SIZE], *type_name, *subtype_name;
 	int				i;
 
@@ -755,8 +785,14 @@ image_raw_open(
 	img->raw.type    = TYPE_DEVICE;
 	img->raw.subtype = SUBTYPE_NONE;
 	img->raw.fli     = CW_FLOPPYINFO_INIT;
+#ifdef CW_CATWEASEL_OSX
+	if (string_is_cwmac_device(path))
+		{
+		if (cwmac_open(path, &img->raw.fli, &img->raw.osx_c, &img->raw.osx_drive) == 0) goto done;
+		}
+#else /* CW_CATWEASEL_OSX */
 	if (file_ioctl(&img->raw.fil[0], CW_IOC_GFLPARM, &img->raw.fli, FILE_FLAG_RETURN) == 0) goto done;
-
+#endif /* CW_CATWEASEL_OSX */
 	/*
 	 * check if we have a pipe or a regular file, write magic bytes if
 	 * file was opened for writing, or check magic bytes if it was opened
@@ -820,17 +856,19 @@ image_raw_close(
 	union image			*img)
 
 	{
-	struct track_header		trk_hdr;
-	unsigned char			data[GLOBAL_MAX_TRACK_SIZE];
-	struct fifo			ffo = FIFO_INIT(data, sizeof (data));
-
-	/* read remaining data if we have a pipe to prevent "broken pipe" */
-
-	if ((file_is_readable(&img->raw.fil[0])) && (img->raw.type == TYPE_PIPE))
+#ifdef CW_CATWEASEL_OSX
+	if (img->raw.osx_c)
 		{
-		while (image_raw_read_track2(&img->raw, &img->raw.fil[0], NULL, &trk_hdr, &ffo, img->raw.subtype) > 0) ;
-		file_close(&img->raw.fil[1]);
+		cwmac_close(img->raw.osx_c);
+		free(img->raw.osx_c);
 		}
+	else
+		{
+		image_raw_close_read_remaining(img);
+		}
+#else /* CW_CATWEASEL_OSX */
+	image_raw_close_read_remaining(img);
+#endif /* CW_CATWEASEL_OSX */
 	return (image_close(img, &img->raw.fil[0]));
 	}
 

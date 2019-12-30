@@ -18,6 +18,9 @@
 #include "../file.h"
 #include "../parse.h"
 #include "desc.h"
+#ifdef CW_CATWEASEL_OSX
+#include "cw2dmk-osx/cwfloppy.h"
+#endif /* CW_CATWEASEL_OSX */
 
 /* number of retries + first read == GLOBAL_NR_RETRIES + 1 */
 
@@ -46,6 +49,10 @@ struct image_raw
 	{
 	struct file			fil[2];
 	struct cw_floppyinfo		fli;
+#ifdef CW_CATWEASEL_OSX
+	catweasel_contr                 *osx_c;
+	int				osx_drive;
+#endif /* CW_CATWEASEL_OSX */
 	struct image_raw_hint		hnt[IMAGE_RAW_NR_HINTS];
 	int				hints;
 	int				type;

@@ -387,7 +387,7 @@ cleanup_static_devices()
 
 # default settings
 
-VERSION="$(uname -r | awk 'BEGIN { FS="."; } { print($1 $2); }')"
+VERSION="$(uname -r | sed 's/-.*$//' | awk 'BEGIN { FS="."; } { print($1 $2); }')"
 [ "$MAJOR" ]               || MAJOR="120"
 [ "$BIN_DIR" ]             || BIN_DIR="/usr/bin"
 [ "$MAN_DIR" ]             || MAN_DIR="/usr/share/man"

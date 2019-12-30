@@ -771,7 +771,7 @@ static struct format_option		fm_nec765_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("match_simple",          MAGIC_MATCH_SIMPLE,          1),
 	FORMAT_OPTION_BOOLEAN("match_simple_fixup",    MAGIC_MATCH_SIMPLE_FIXUP,    1),
-	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",              MAGIC_POSTCOMP_SIMPLE,       1),
+	FORMAT_OPTION_BOOLEAN_COMPAT("postcomp",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_BOOLEAN("postcomp_simple",       MAGIC_POSTCOMP_SIMPLE,       1),
 	FORMAT_OPTION_END
 	};
@@ -820,7 +820,7 @@ static struct format_option		fm_nec765_rw_options[] =
 	FORMAT_OPTION_INTEGER("crc16_init_value2", MAGIC_CRC16_INIT_VALUE2,  1),
 	FORMAT_OPTION_INTEGER("crc16_init_value3", MAGIC_CRC16_INIT_VALUE3,  1),
 	FORMAT_OPTION_INTEGER("sector_sizes",      MAGIC_SECTOR_SIZES,      -1),
-	FORMAT_OPTION_INTEGER_COMPAT("bounds",            MAGIC_BOUNDS_OLD,         6),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",     MAGIC_BOUNDS_OLD,         6),
 	FORMAT_OPTION_INTEGER("bounds_old",        MAGIC_BOUNDS_OLD,         6),
 	FORMAT_OPTION_INTEGER("bounds_new",        MAGIC_BOUNDS_NEW,         6),
 	FORMAT_OPTION_END

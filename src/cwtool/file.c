@@ -61,11 +61,7 @@ file_tmp(
 	len = snprintf(
 		path,
 		size,
-#ifdef __APPLE__
-		"%s/%s-%010d-%010ld-%06ld-%05d"
-#else /* __APPLE__ */
 		"%s/%s-%010d-%010ld-%06ld-%05d",
-#endif /* __APPLE__ */
 		tmp_dir,
 		global_program_name(),
 		count++,
@@ -118,6 +114,8 @@ file_open(
 	cw_flag_t			flags)
 
 	{
+	cw_bool_t			skip_fd_check = CW_BOOL_FALSE;
+
 	debug_error_condition((mode != FILE_MODE_READ) && (mode != FILE_MODE_WRITE) && (mode != FILE_MODE_CREATE) && (mode != FILE_MODE_TMP));
 	*fil = (struct file)
 		{
@@ -133,30 +131,62 @@ file_open(
 
 	if (mode == FILE_MODE_READ)
 		{
-		if (! string_equal(path, "-"))
+		debug_error_condition(path == NULL);
+		if (string_equal(path, "-"))
+			{
+			fil->fd = STDIN_FILENO;
+			}
+#ifdef CW_CATWEASEL_OSX
+		else if (string_is_cwmac_device(path))
+			{
+			verbose_message(GENERIC, 2, "using cwmac device '%s' for reading", path);
+			skip_fd_check = CW_BOOL_TRUE;
+			}
+#endif /* CW_CATWEASEL_OSX */
+		else
 			{
 			verbose_message(GENERIC, 2, "opening '%s' for reading", path);
 			fil->fd = open(path, O_RDONLY);
 			}
-		else fil->fd = STDIN_FILENO;
 		}
 	else if (mode == FILE_MODE_WRITE)
 		{
-		if (! string_equal(path, "-"))
+		debug_error_condition(path == NULL);
+		if (string_equal(path, "-"))
+			{
+			fil->fd = STDOUT_FILENO;
+			}
+#ifdef CW_CATWEASEL_OSX
+		else if (string_is_cwmac_device(path))
+			{
+			verbose_message(GENERIC, 2, "using cwmac device '%s' for writing", path);
+			skip_fd_check = CW_BOOL_TRUE;
+			}
+#endif /* CW_CATWEASEL_OSX */
+		else
 			{
 			verbose_message(GENERIC, 2, "opening '%s' for writing", path);
 			fil->fd = open(path, O_WRONLY);
 			}
-		else fil->fd = STDOUT_FILENO;
 		}
 	else if (mode == FILE_MODE_CREATE)
 		{
-		if (! string_equal(path, "-"))
+		debug_error_condition(path == NULL);
+		if (string_equal(path, "-"))
+			{
+			fil->fd = STDOUT_FILENO;
+			}
+#ifdef CW_CATWEASEL_OSX
+		else if (string_is_cwmac_device(path))
+			{
+			debug_error();
+			}
+#endif /* CW_CATWEASEL_OSX */
+		else
 			{
 			verbose_message(GENERIC, 2, "truncating or creating '%s' for writing", path);
 			fil->fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 			}
-		else fil->fd = STDOUT_FILENO;
 		}
 	else
 		{
@@ -172,7 +202,7 @@ file_open(
 
 	/* check if open was successful */
 
-	if (fil->fd == -1)
+	if ((! skip_fd_check) && (fil->fd == -1))
 		{
 		if (flags & FILE_FLAG_RETURN) return (CW_BOOL_FAIL);
 		error_perror_message("error while opening '%s'", path);

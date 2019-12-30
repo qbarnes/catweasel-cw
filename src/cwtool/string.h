@@ -26,6 +26,12 @@ string_equal2(
 	const cw_char_t			*string2,
 	const cw_char_t			*string3);
 
+#ifdef CW_CATWEASEL_OSX
+extern cw_bool_t
+string_is_cwmac_device(
+	const cw_char_t			*string);
+#endif /* CW_CATWEASEL_OSX */
+
 extern cw_count_t
 string_length(
 	const cw_char_t			*string);

@@ -1,3 +1,12 @@
+cw 0.13-20131228
+	* kernel driver: fixed the Makefile to handle kernel version
+	  strings like 3.8-trunk correctly
+	* on non-linux platforms the driver build is now omitted and cwtool is
+	  built standalone
+	* included support to build cwtool together with the catweasel OS X
+	  driver from http://catweasel-osx.sourceforge.net/ (thanks to
+	  David Schmidt)
+
 cw 0.13-20130306
 	* man page: added information about the difference between 5.25" DD
 	  and HD disks (thanks to Levente Harsfalvi)

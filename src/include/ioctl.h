@@ -28,7 +28,12 @@
 
 #ifdef __APPLE__
 #include <sys/ioccom.h>
-#endif
+#endif /* __APPLE__ */
+
+#ifdef __CYGWIN__
+#define __USE_LINUX_IOCTL_DEFS
+#include <sys/ioctl.h>
+#endif /* __CYGWIN__ */
 
 #include "types.h"
 

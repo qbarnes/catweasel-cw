@@ -55,6 +55,24 @@ string_equal2(
 
 
 /****************************************************************************
+ * string_is_cwmac_device
+ ****************************************************************************/
+#ifdef CW_CATWEASEL_OSX
+cw_bool_t
+string_is_cwmac_device(
+	const cw_char_t			*string)
+
+	{
+	return ((string_equal(string, "Cat0d0")) ||
+		(string_equal(string, "Cat0d1")) ||
+		(string_equal(string, "Cat1d0")) ||
+		(string_equal(string, "Cat1d1")));
+	}
+#endif /* CW_CATWEASEL_OSX */
+
+
+
+/****************************************************************************
  * string_length
  ****************************************************************************/
 cw_count_t

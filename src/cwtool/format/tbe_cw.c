@@ -822,7 +822,7 @@ static struct format_option		tbe_cw_rw_options[] =
 	FORMAT_OPTION_INTEGER("crc16_init_value", MAGIC_CRC16_INIT_VALUE,  1),
 	FORMAT_OPTION_INTEGER("sector0_size",     MAGIC_SECTOR0_SIZE,      1),
 	FORMAT_OPTION_INTEGER("sector_size",      MAGIC_SECTOR_SIZE,       1),
-	FORMAT_OPTION_INTEGER_COMPAT("bounds",           MAGIC_BOUNDS_OLD,       18),
+	FORMAT_OPTION_INTEGER_COMPAT("bounds",    MAGIC_BOUNDS_OLD,       18),
 	FORMAT_OPTION_INTEGER("bounds_old",       MAGIC_BOUNDS_OLD,       18),
 	FORMAT_OPTION_INTEGER("bounds_new",       MAGIC_BOUNDS_NEW,       18),
 	FORMAT_OPTION_END
