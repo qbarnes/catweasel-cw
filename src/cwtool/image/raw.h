@@ -13,8 +13,8 @@
 #ifndef CWTOOL_IMAGE_RAW_H
 #define CWTOOL_IMAGE_RAW_H
 
-#include "file.h"
-#include "cwtool.h"
+#include "../file.h"
+#include "../cwtool.h"
 
 /*
  * if CWTOOL_MAX_RETRIES is 10 this effectively means we do one read and up
@@ -25,7 +25,7 @@
 
 struct image_raw_hint
 	{
-	unsigned char			file;
+	unsigned char			file;	/* index for struct file in struct image_raw */
 	unsigned char			track;
 	unsigned char			clock;
 	unsigned char			flags;

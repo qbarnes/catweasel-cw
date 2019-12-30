@@ -13,8 +13,8 @@
 #ifndef CWTOOL_IMAGE_D64_H
 #define CWTOOL_IMAGE_D64_H
 
-#include "file.h"
-#include "cwtool.h"
+#include "../file.h"
+#include "../cwtool.h"
 
 struct image_d64
 	{

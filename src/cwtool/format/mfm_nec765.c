@@ -12,17 +12,17 @@
 
 #include <stdio.h>
 
-#include "format/mfm_nec765.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "disk.h"
-#include "fifo.h"
-#include "format.h"
-#include "format/mfm.h"
-#include "format/raw.h"
-#include "format/setvalue.h"
+#include "mfm_nec765.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../format.h"
+#include "mfm.h"
+#include "raw.h"
+#include "setvalue.h"
 
 
 
@@ -42,7 +42,23 @@
 #define FLAG_RD_IGNORE_CHECKSUMS	(1 << 1)
 #define FLAG_RD_IGNORE_TRACK_MISMATCH	(1 << 2)
 #define FLAG_RD_IGNORE_FORMAT_BYTE	(1 << 3)
-#define FLAG_RW_CRC16_INIT_VALUE_SET	(1 << 4)
+#define FLAG_RD_POSTCOMP		(1 << 4)
+#define FLAG_RW_CRC16_INIT_VALUE_SET	(1 << 5)
+
+
+
+/****************************************************************************
+ * mfm_nec765_track_number
+ ****************************************************************************/
+static int
+mfm_nec765_track_number(
+	struct mfm_nec765		*mfm_nec,
+	int				track)
+
+	{
+	if (mfm_nec->rw.track_step == 1) return (track);
+	return ((track / mfm_nec->rw.track_step) + (track % 2));
+	}
 
 
 
@@ -156,6 +172,7 @@ mfm_nec765_read_sector(
 	/* accept only valid sector numbers */
 
 	sector = header[3] - 1;
+	track  = mfm_nec765_track_number(mfm_nec, track);
 	if ((sector < 0) || (sector >= mfm_nec->rw.sectors))
 		{
 		verbose(1, "sector %d out of range", sector);
@@ -218,8 +235,8 @@ mfm_nec765_write_sector(
 
 	verbose(1, "writing sector %d", sector);
 	header[0] = mfm_nec->rw.id_address_mark;
-	header[1] = track / 2;
-	header[2] = track % 2;
+	header[1] = mfm_nec765_track_number(mfm_nec, track) / 2;
+	header[2] = mfm_nec765_track_number(mfm_nec, track) % 2;
 	header[3] = sector + 1;
 	header[4] = mfm_nec765_sector_shift(mfm_nec, sector);
 	data[0]   = mfm_nec->rw.data_address_mark1;
@@ -242,8 +259,9 @@ mfm_nec765_statistics(
 	int				track)
 
 	{
-	raw_histogram(ffo_l0, track);
+	raw_histogram(ffo_l0, track, mfm_nec765_track_number(&fmt->mfm_nec, track));
 	raw_precomp_statistics(ffo_l0, fmt->mfm_nec.rw.bnd, 3);
+	if (fmt->mfm_nec.rd.flags & FLAG_RD_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->mfm_nec.rw.bnd, 3, track, mfm_nec765_track_number(&fmt->mfm_nec, track));
 	return (1);
 	}
 
@@ -264,6 +282,7 @@ mfm_nec765_read_track(
 	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
 	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
 
+	if (fmt->mfm_nec.rd.flags & FLAG_RD_POSTCOMP) raw_postcomp(ffo_l0, fmt->mfm_nec.rw.bnd, 3);
 	raw_read(ffo_l0, &ffo_l1, fmt->mfm_nec.rw.bnd, 3);
 	while (mfm_nec765_read_sector(&ffo_l1, &fmt->mfm_nec, dsk_sct, track) != -1) ;
 	return (1);
@@ -318,34 +337,36 @@ mfm_nec765_write_track(
 #define MAGIC_IGNORE_CHECKSUMS		2
 #define MAGIC_IGNORE_TRACK_MISMATCH	3
 #define MAGIC_IGNORE_FORMAT_BYTE	4
-#define MAGIC_PROLOG_LENGTH		5
-#define MAGIC_PROLOG_VALUE		6
-#define MAGIC_EPILOG_LENGTH		7
-#define MAGIC_EPILOG_VALUE		8
-#define MAGIC_FILL_LENGTH1		9
-#define MAGIC_FILL_VALUE1		10
-#define MAGIC_FILL_LENGTH2		11
-#define MAGIC_FILL_VALUE2		12
-#define MAGIC_FILL_LENGTH3		13
-#define MAGIC_FILL_VALUE3		14
-#define MAGIC_FILL_LENGTH4		15
-#define MAGIC_FILL_VALUE4		16
-#define MAGIC_FILL_LENGTH5		17
-#define MAGIC_FILL_VALUE5		18
-#define MAGIC_FILL_LENGTH6		19
-#define MAGIC_FILL_VALUE6		20
-#define MAGIC_FILL_LENGTH7		21
-#define MAGIC_FILL_VALUE7		22
-#define MAGIC_PRECOMP			23
-#define MAGIC_SECTORS			24
-#define MAGIC_SYNC_LENGTH		25
-#define MAGIC_SYNC_VALUE		26
-#define MAGIC_CRC16_INIT_VALUE		27
-#define MAGIC_ID_ADDRESS_MARK		28
-#define MAGIC_DATA_ADDRESS_MARK1	29
-#define MAGIC_DATA_ADDRESS_MARK2	30
-#define MAGIC_SECTOR_SIZES		31
-#define MAGIC_BOUNDS			32
+#define MAGIC_POSTCOMP			5
+#define MAGIC_PROLOG_LENGTH		6
+#define MAGIC_PROLOG_VALUE		7
+#define MAGIC_EPILOG_LENGTH		8
+#define MAGIC_EPILOG_VALUE		9
+#define MAGIC_FILL_LENGTH1		10
+#define MAGIC_FILL_VALUE1		11
+#define MAGIC_FILL_LENGTH2		12
+#define MAGIC_FILL_VALUE2		13
+#define MAGIC_FILL_LENGTH3		14
+#define MAGIC_FILL_VALUE3		15
+#define MAGIC_FILL_LENGTH4		16
+#define MAGIC_FILL_VALUE4		17
+#define MAGIC_FILL_LENGTH5		18
+#define MAGIC_FILL_VALUE5		19
+#define MAGIC_FILL_LENGTH6		20
+#define MAGIC_FILL_VALUE6		21
+#define MAGIC_FILL_LENGTH7		22
+#define MAGIC_FILL_VALUE7		23
+#define MAGIC_PRECOMP			24
+#define MAGIC_SECTORS			25
+#define MAGIC_SYNC_LENGTH		26
+#define MAGIC_SYNC_VALUE		27
+#define MAGIC_CRC16_INIT_VALUE		28
+#define MAGIC_ID_ADDRESS_MARK		29
+#define MAGIC_DATA_ADDRESS_MARK1	30
+#define MAGIC_DATA_ADDRESS_MARK2	31
+#define MAGIC_TRACK_STEP		32
+#define MAGIC_SECTOR_SIZES		33
+#define MAGIC_BOUNDS			34
 
 
 
@@ -416,6 +437,7 @@ mfm_nec765_set_defaults(
 			.id_address_mark    = 0xfe,
 			.data_address_mark1 = 0xfb,
 			.data_address_mark2 = 0xf8,
+			.track_step         = 1,
 			.bnd                =
 				{
 				BOUNDS(0x0800, 0x1b52, 0x2300, 1),
@@ -448,8 +470,9 @@ mfm_nec765_set_read_option(
 	if (magic == MAGIC_IGNORE_SECTOR_SIZE)    return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_SECTOR_SIZE));
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_CHECKSUMS));
 	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_TRACK_MISMATCH));
-	debug_error_condition(magic != MAGIC_IGNORE_FORMAT_BYTE);
-	return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_FORMAT_BYTE));
+	if (magic == MAGIC_IGNORE_FORMAT_BYTE)    return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_IGNORE_FORMAT_BYTE));
+	debug_error_condition(magic != MAGIC_POSTCOMP);
+	return (setvalue_uchar_bit(&fmt->mfm_nec.rd.flags, val, FLAG_RD_POSTCOMP));
 	}
 
 
@@ -526,6 +549,7 @@ mfm_nec765_set_rw_option(
 	if (magic == MAGIC_ID_ADDRESS_MARK)    return (setvalue_uchar(&fmt->mfm_nec.rw.id_address_mark, val, 0, 0xff));
 	if (magic == MAGIC_DATA_ADDRESS_MARK1) return (setvalue_uchar(&fmt->mfm_nec.rw.data_address_mark1, val, 0, 0xff));
 	if (magic == MAGIC_DATA_ADDRESS_MARK2) return (setvalue_uchar(&fmt->mfm_nec.rw.data_address_mark2, val, 0, 0xff));
+	if (magic == MAGIC_TRACK_STEP)         return (setvalue_uchar(&fmt->mfm_nec.rw.track_step, val, 1, 2));
 	if (magic == MAGIC_SECTOR_SIZES)       return (mfm_set_sector_size(fmt->mfm_nec.rw.pshift, ofs, CWTOOL_MAX_SECTOR, val));
 	debug_error_condition(magic != MAGIC_BOUNDS);
 	return (setvalue_bounds(fmt->mfm_nec.rw.bnd, val, ofs));
@@ -587,6 +611,7 @@ static struct format_option		mfm_nec765_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("ignore_format_byte",    MAGIC_IGNORE_FORMAT_BYTE,    1),
+	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
 	FORMAT_OPTION_END
 	};
 
@@ -633,6 +658,7 @@ static struct format_option		mfm_nec765_rw_options[] =
 	FORMAT_OPTION_INTEGER("id_address_mark",    MAGIC_ID_ADDRESS_MARK,     1),
 	FORMAT_OPTION_INTEGER("data_address_mark1", MAGIC_DATA_ADDRESS_MARK1,  1),
 	FORMAT_OPTION_INTEGER("data_address_mark2", MAGIC_DATA_ADDRESS_MARK2,  1),
+	FORMAT_OPTION_INTEGER("track_step",         MAGIC_TRACK_STEP,          1),
 	FORMAT_OPTION_INTEGER("sector_sizes",       MAGIC_SECTOR_SIZES,       -1),
 	FORMAT_OPTION_INTEGER("bounds",             MAGIC_BOUNDS,              9),
 	FORMAT_OPTION_END

@@ -12,10 +12,10 @@
 
 #include <stdio.h>
 
-#include "format/bounds.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
+#include "bounds.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
 
 
 

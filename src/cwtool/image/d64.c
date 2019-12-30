@@ -12,14 +12,14 @@
 
 #include <stdio.h>
 
-#include "image/d64.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "disk.h"
-#include "fifo.h"
-#include "file.h"
-#include "image.h"
+#include "d64.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../file.h"
+#include "../image.h"
 
 
 

@@ -13,7 +13,7 @@
 #ifndef CWTOOL_MFM_H
 #define CWTOOL_MFM_H
 
-#include "format/mfmfm.h"
+#include "mfmfm.h"
 
 struct fifo;
 struct disk_error;

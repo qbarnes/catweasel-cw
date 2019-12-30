@@ -13,7 +13,7 @@
 #ifndef CWTOOL_GCR_APPLE_H
 #define CWTOOL_GCR_APPLE_H
 
-#include "format/bounds.h"
+#include "bounds.h"
 
 struct gcr_apple
 	{
@@ -36,12 +36,23 @@ struct gcr_apple
 		{
 		unsigned char		sectors;
 		unsigned char		volume_id;
-		unsigned char		reserved[2];
+		unsigned char		mode;
+		unsigned char		reserved;
 		unsigned int		sync_value1;
 		unsigned int		sync_value2;
 		struct bounds		bnd[3];
 		}			rw;
 	};
+
+/*
+ * do not put this include at the beginning of the file, because ../format.h
+ * also includes this file to construct union format. so the above struct
+ * has to be known at time of inclusion
+ */
+
+#include "../format.h"
+
+extern struct format_desc		gcr_apple_format_desc;
 
 
 

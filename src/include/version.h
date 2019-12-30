@@ -13,8 +13,8 @@
 #ifndef CW_VERSION_H
 #define CW_VERSION_H
 
-#define VERSION				"0.11"
-#define VERSION_DATE			"20060806"
+#define VERSION				"0.12"
+#define VERSION_DATE			"20070305"
 
 
 

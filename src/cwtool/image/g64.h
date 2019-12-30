@@ -13,7 +13,7 @@
 #ifndef CWTOOL_IMAGE_G64_H
 #define CWTOOL_IMAGE_G64_H
 
-#include "file.h"
+#include "../file.h"
 
 #define IMAGE_G64_MAX_TRACK		84
 

@@ -159,7 +159,7 @@ file_open(
 
 	/*
 	 * tmp files are unlinked after creation, just keeping the fd open is
-	 * enough for our needs
+	 * enough for what is done here
 	 */
 
 	if (mode == FILE_MODE_TMP)

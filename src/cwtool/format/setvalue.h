@@ -13,7 +13,7 @@
 #ifndef CWTOOL_FORMAT_SETVALUE_H
 #define CWTOOL_FORMAT_SETVALUE_H
 
-#include "setvalue.h"
+#include "../setvalue.h"
 
 struct bounds;
 

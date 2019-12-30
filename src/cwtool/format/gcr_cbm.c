@@ -22,16 +22,16 @@
 
 #include <stdio.h>
 
-#include "format/gcr_cbm.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "disk.h"
-#include "fifo.h"
-#include "format.h"
-#include "format/raw.h"
-#include "format/setvalue.h"
+#include "gcr_cbm.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../format.h"
+#include "raw.h"
+#include "setvalue.h"
 
 
 
@@ -218,6 +218,7 @@ gcr_write_bytes(
 #define FLAG_IGNORE_CHECKSUMS		(1 << 0)
 #define FLAG_IGNORE_TRACK_MISMATCH	(1 << 1)
 #define FLAG_IGNORE_DATA_ID		(1 << 2)
+#define FLAG_POSTCOMP			(1 << 3)
 
 
 
@@ -409,8 +410,9 @@ gcr_cbm_statistics(
 	int				track)
 
 	{
-	raw_histogram(ffo_l0, track);
+	raw_histogram(ffo_l0, track, gcr_cbm_track_number(&fmt->gcr_cbm, track));
 	raw_precomp_statistics(ffo_l0, fmt->gcr_cbm.rw.bnd, 3);
+	if (fmt->gcr_cbm.rd.flags & FLAG_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->gcr_cbm.rw.bnd, 3, track, gcr_cbm_track_number(&fmt->gcr_cbm, track));
 	return (1);
 	}
 
@@ -431,6 +433,7 @@ gcr_cbm_read_track(
 	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
 	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
 
+	if (fmt->gcr_cbm.rd.flags & FLAG_POSTCOMP) raw_postcomp(ffo_l0, fmt->gcr_cbm.rw.bnd, 3);
 	raw_read(ffo_l0, &ffo_l1, fmt->gcr_cbm.rw.bnd, 3);
 	while (gcr_cbm_read_sector(&ffo_l1, &fmt->gcr_cbm, dsk_sct, track) != -1) ;
 	return (1);
@@ -479,16 +482,17 @@ gcr_cbm_write_track(
 #define MAGIC_IGNORE_CHECKSUMS		2
 #define MAGIC_IGNORE_TRACK_MISMATCH	3
 #define MAGIC_IGNORE_DATA_ID		4
-#define MAGIC_PROLOG_LENGTH		5
-#define MAGIC_EPILOG_LENGTH		6
-#define MAGIC_FILL_LENGTH		7
-#define MAGIC_FILL_VALUE		8
-#define MAGIC_PRECOMP			9
-#define MAGIC_SECTORS			10
-#define MAGIC_HEADER_ID			11
-#define MAGIC_DATA_ID			12
-#define MAGIC_TRACK_STEP		13
-#define MAGIC_BOUNDS			14
+#define MAGIC_POSTCOMP			5
+#define MAGIC_PROLOG_LENGTH		6
+#define MAGIC_EPILOG_LENGTH		7
+#define MAGIC_FILL_LENGTH		8
+#define MAGIC_FILL_VALUE		9
+#define MAGIC_PRECOMP			10
+#define MAGIC_SECTORS			11
+#define MAGIC_HEADER_ID			12
+#define MAGIC_DATA_ID			13
+#define MAGIC_TRACK_STEP		14
+#define MAGIC_BOUNDS			15
 
 
 
@@ -554,8 +558,9 @@ gcr_cbm_set_read_option(
 	if (magic == MAGIC_SYNC_LENGTH)           return (setvalue_ushort(&fmt->gcr_cbm.rd.sync_length, val, 9, 0x400));
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_CHECKSUMS));
 	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_TRACK_MISMATCH));
-	debug_error_condition(magic != MAGIC_IGNORE_DATA_ID);
-	return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_DATA_ID));
+	if (magic == MAGIC_IGNORE_DATA_ID)        return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_IGNORE_DATA_ID));
+	debug_error_condition(magic != MAGIC_POSTCOMP);
+	return (setvalue_uchar_bit(&fmt->gcr_cbm.rd.flags, val, FLAG_POSTCOMP));
 	}
 
 
@@ -656,6 +661,7 @@ static struct format_option		gcr_cbm_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("ignore_data_id",        MAGIC_IGNORE_DATA_ID,        1),
+	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
 	FORMAT_OPTION_END
 	};
 

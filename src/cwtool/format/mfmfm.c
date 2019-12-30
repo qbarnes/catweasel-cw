@@ -12,12 +12,12 @@
 
 #include <stdio.h>
 
-#include "format/mfmfm.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "disk.h"
-#include "fifo.h"
+#include "mfmfm.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../disk.h"
+#include "../fifo.h"
 
 
 

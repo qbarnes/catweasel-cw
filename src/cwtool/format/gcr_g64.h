@@ -13,7 +13,7 @@
 #ifndef CWTOOL_GCR_G64_H
 #define CWTOOL_GCR_G64_H
 
-#include "format/bounds.h"
+#include "bounds.h"
 
 struct gcr_g64
 	{
@@ -43,6 +43,16 @@ struct gcr_g64
 		struct bounds		bnd[4][3];
 		}			rw;
 	};
+
+/*
+ * do not put this include at the beginning of the file, because ../format.h
+ * also includes this file to construct union format. so the above struct
+ * has to be known at time of inclusion
+ */
+
+#include "../format.h"
+
+extern struct format_desc		gcr_g64_format_desc;
 
 
 

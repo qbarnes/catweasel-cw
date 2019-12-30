@@ -322,6 +322,22 @@ cwfloppy_add_timer2(
 
 
 /****************************************************************************
+ * cwfloppy_motor_wait
+ ****************************************************************************/
+static void
+cwfloppy_motor_wait(
+	struct cw_floppy		*flp)
+
+	{
+	cw_debug(2, "[c%df%d] will wait for motor spin up", cnt_num, flp->num);
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ);
+	cw_debug(2, "[c%df%d] spin up done", cnt_num, flp->num);
+	}
+
+
+
+/****************************************************************************
  * cwfloppy_motor_on
  ****************************************************************************/
 static void
@@ -358,10 +374,7 @@ cwfloppy_motor_on(
 	spin_lock_irqsave(&flp->fls->lock, flags);
 	cwhardware_floppy_motor_on(&cnt_hrd, flp->num);
 	spin_unlock_irqrestore(&flp->fls->lock, flags);
-	cw_debug(2, "[c%df%d] will wait for motor spin up", cnt_num, flp->num);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ);
-	cw_debug(2, "[c%df%d] spin up done", cnt_num, flp->num);
+	cwfloppy_motor_wait(flp);
 	flp->motor = 1;
 	}
 
@@ -536,8 +549,16 @@ cwfloppy_get_model(
 	{
 
 	/*
+	 * turn the motor on, because some drives will not seek if the motor
+	 * is off
+	 */
+
+	cwhardware_floppy_motor_on(&cnt_hrd, flp->num);
+	cwfloppy_motor_wait(flp);
+
+	/*
 	 * a floppy is present if we get a track0 signal while moving
-	 * the head, this routine is only called from cwfloppy_init(),
+	 * the head (seek), this routine is only called from cwfloppy_init(),
 	 * so no concurrent accesses to the control register via
 	 * cwhardware_*()-functions may happen, so no protection with
 	 * flp->fls->lock is needed
@@ -545,6 +566,9 @@ cwfloppy_get_model(
 
 	cwhardware_floppy_select(&cnt_hrd, flp->num, 0, cwfloppy_get_density(flp));
 	cwfloppy_calibrate(flp);
+
+	/* this automatically deselects the floppy */
+
 	cwhardware_floppy_motor_off(&cnt_hrd, flp->num);
 	if (flp->track == 0) return (CW_FLOPPY_MODEL_AUTO);
 	return (CW_FLOPPY_MODEL_NONE);

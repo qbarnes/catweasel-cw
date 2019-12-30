@@ -12,17 +12,17 @@
 
 #include <stdio.h>
 
-#include "format/fm_nec765.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "disk.h"
-#include "fifo.h"
-#include "format.h"
-#include "format/fm.h"
-#include "format/raw.h"
-#include "format/setvalue.h"
+#include "fm_nec765.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../format.h"
+#include "fm.h"
+#include "raw.h"
+#include "setvalue.h"
 
 
 
@@ -41,9 +41,10 @@
 #define FLAG_RD_IGNORE_SECTOR_SIZE	(1 << 0)
 #define FLAG_RD_IGNORE_CHECKSUMS	(1 << 1)
 #define FLAG_RD_IGNORE_TRACK_MISMATCH	(1 << 2)
-#define FLAG_RW_CRC16_INIT_VALUE1_SET	(1 << 3)
-#define FLAG_RW_CRC16_INIT_VALUE2_SET	(1 << 4)
-#define FLAG_RW_CRC16_INIT_VALUE3_SET	(1 << 5)
+#define FLAG_RD_POSTCOMP		(1 << 3)
+#define FLAG_RW_CRC16_INIT_VALUE1_SET	(1 << 4)
+#define FLAG_RW_CRC16_INIT_VALUE2_SET	(1 << 5)
+#define FLAG_RW_CRC16_INIT_VALUE3_SET	(1 << 6)
 
 
 
@@ -190,7 +191,7 @@ fm_nec765_read_sector(
 	 */
 
 	disk_set_sector_number(&dsk_sct[sector], sector);
-	disk_sector_read(&dsk_sct[sector], &dsk_err, &data[1]);
+	disk_sector_read(&dsk_sct[sector], &dsk_err, data);
 	return (1);
 	}
 
@@ -236,8 +237,9 @@ fm_nec765_statistics(
 	int				track)
 
 	{
-	raw_histogram(ffo_l0, track);
+	raw_histogram(ffo_l0, track, track);
 	raw_precomp_statistics(ffo_l0, fmt->fm_nec.rw.bnd, 2);
+	if (fmt->fm_nec.rd.flags & FLAG_RD_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->fm_nec.rw.bnd, 2, track, track);
 	return (1);
 	}
 
@@ -258,6 +260,7 @@ fm_nec765_read_track(
 	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
 	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
 
+	if (fmt->fm_nec.rd.flags & FLAG_RD_POSTCOMP) raw_postcomp(ffo_l0, fmt->fm_nec.rw.bnd, 2);
 	raw_read(ffo_l0, &ffo_l1, fmt->fm_nec.rw.bnd, 2);
 	while (fm_nec765_read_sector(&ffo_l1, &fmt->fm_nec, dsk_sct, track) != -1) ;
 	return (1);
@@ -309,34 +312,35 @@ fm_nec765_write_track(
 #define MAGIC_IGNORE_SECTOR_SIZE	1
 #define MAGIC_IGNORE_CHECKSUMS		2
 #define MAGIC_IGNORE_TRACK_MISMATCH	3
-#define MAGIC_PROLOG_LENGTH		4
-#define MAGIC_PROLOG_VALUE		5
-#define MAGIC_EPILOG_LENGTH		6
-#define MAGIC_EPILOG_VALUE		7
-#define MAGIC_FILL_LENGTH1		8
-#define MAGIC_FILL_VALUE1		9
-#define MAGIC_FILL_LENGTH2		10
-#define MAGIC_FILL_VALUE2		11
-#define MAGIC_FILL_LENGTH3		12
-#define MAGIC_FILL_VALUE3		13
-#define MAGIC_FILL_LENGTH4		14
-#define MAGIC_FILL_VALUE4		15
-#define MAGIC_FILL_LENGTH5		16
-#define MAGIC_FILL_VALUE5		17
-#define MAGIC_FILL_LENGTH6		18
-#define MAGIC_FILL_VALUE6		19
-#define MAGIC_FILL_LENGTH7		20
-#define MAGIC_FILL_VALUE7		21
-#define MAGIC_PRECOMP			22
-#define MAGIC_SECTORS			23
-#define MAGIC_SYNC_VALUE1		24
-#define MAGIC_SYNC_VALUE2		25
-#define MAGIC_SYNC_VALUE3		26
-#define MAGIC_CRC16_INIT_VALUE1		27
-#define MAGIC_CRC16_INIT_VALUE2		28
-#define MAGIC_CRC16_INIT_VALUE3		29
-#define MAGIC_SECTOR_SIZES		30
-#define MAGIC_BOUNDS			31
+#define MAGIC_POSTCOMP			4
+#define MAGIC_PROLOG_LENGTH		5
+#define MAGIC_PROLOG_VALUE		6
+#define MAGIC_EPILOG_LENGTH		7
+#define MAGIC_EPILOG_VALUE		8
+#define MAGIC_FILL_LENGTH1		9
+#define MAGIC_FILL_VALUE1		10
+#define MAGIC_FILL_LENGTH2		11
+#define MAGIC_FILL_VALUE2		12
+#define MAGIC_FILL_LENGTH3		13
+#define MAGIC_FILL_VALUE3		14
+#define MAGIC_FILL_LENGTH4		15
+#define MAGIC_FILL_VALUE4		16
+#define MAGIC_FILL_LENGTH5		17
+#define MAGIC_FILL_VALUE5		18
+#define MAGIC_FILL_LENGTH6		19
+#define MAGIC_FILL_VALUE6		20
+#define MAGIC_FILL_LENGTH7		21
+#define MAGIC_FILL_VALUE7		22
+#define MAGIC_PRECOMP			23
+#define MAGIC_SECTORS			24
+#define MAGIC_SYNC_VALUE1		25
+#define MAGIC_SYNC_VALUE2		26
+#define MAGIC_SYNC_VALUE3		27
+#define MAGIC_CRC16_INIT_VALUE1		28
+#define MAGIC_CRC16_INIT_VALUE2		29
+#define MAGIC_CRC16_INIT_VALUE3		30
+#define MAGIC_SECTOR_SIZES		31
+#define MAGIC_BOUNDS			32
 
 
 
@@ -356,7 +360,7 @@ fm_nec765_set_crc16_init_value(
 
 	if (fm_nec->rw.flags & mask) return (1);
 	for (data = 0, i = 0x4000; i > 0; i >>= 2) data = (data << 1) | ((sync_value & i) ? 1 : 0);
-	*init_value = fm_crc16(0xffff, &data, i);
+	*init_value = fm_crc16(0xffff, &data, 1);
 	debug(2, "calculated crc16_init_value1 = 0x%04x", *init_value);
 	return (1);
 	}
@@ -450,8 +454,9 @@ fm_nec765_set_read_option(
 	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_IGNORE_SECTOR_SIZE)    return (setvalue_uchar_bit(&fmt->fm_nec.rd.flags, val, FLAG_RD_IGNORE_SECTOR_SIZE));
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->fm_nec.rd.flags, val, FLAG_RD_IGNORE_CHECKSUMS));
-	debug_error_condition(magic != MAGIC_IGNORE_TRACK_MISMATCH);
-	return (setvalue_uchar_bit(&fmt->fm_nec.rd.flags, val, FLAG_RD_IGNORE_TRACK_MISMATCH));
+	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->fm_nec.rd.flags, val, FLAG_RD_IGNORE_TRACK_MISMATCH));
+	debug_error_condition(magic != MAGIC_POSTCOMP);
+	return (setvalue_uchar_bit(&fmt->fm_nec.rd.flags, val, FLAG_RD_POSTCOMP));
 	}
 
 
@@ -620,6 +625,7 @@ static struct format_option		fm_nec765_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_sector_size",    MAGIC_IGNORE_SECTOR_SIZE,    1),
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
+	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
 	FORMAT_OPTION_END
 	};
 

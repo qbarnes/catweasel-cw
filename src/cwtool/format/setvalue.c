@@ -12,11 +12,11 @@
 
 #include <stdio.h>
 
-#include "format/setvalue.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "format/bounds.h"
+#include "setvalue.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "bounds.h"
 
 
 

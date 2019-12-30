@@ -12,16 +12,16 @@
 
 #include <stdio.h>
 
-#include "format/gcr_g64.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "disk.h"
-#include "fifo.h"
-#include "format.h"
-#include "format/raw.h"
-#include "format/setvalue.h"
+#include "gcr_g64.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../format.h"
+#include "raw.h"
+#include "setvalue.h"
 
 
 
@@ -103,6 +103,7 @@ gcr_write_fill(
 #define MAX_SYNCS			(4 * CWTOOL_MAX_SECTOR)
 #define FLAG_STRIP_TRACK		(1 << 0)
 #define FLAG_ALIGN_TRACK		(1 << 1)
+#define FLAG_POSTCOMP			(1 << 2)
 
 
 
@@ -332,7 +333,11 @@ gcr_g64_statistics(
 	int				track)
 
 	{
-	raw_histogram(ffo_l0, track);
+	int				speed = fmt->gcr_g64.rd.speed;
+
+	raw_histogram(ffo_l0, track, track);
+	raw_precomp_statistics(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3);
+	if (fmt->gcr_g64.rd.flags & FLAG_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3, track, track);
 	return (1);
 	}
 
@@ -363,6 +368,7 @@ gcr_g64_read_track(
 	 */
 
 	debug_error_condition((speed < 0) || (speed > 3));
+	if (fmt->gcr_g64.rd.flags & FLAG_POSTCOMP) raw_postcomp(ffo_l0, fmt->gcr_g64.rw.bnd[speed], 3);
 	raw_read(ffo_l0, &ffo_l1_tmp, fmt->gcr_g64.rw.bnd[speed], 3);
 	if (gcr_write_fill(ffo_l1, fmt->gcr_g64.rd.pad_value1, fmt->gcr_g64.rd.pad_length1) == -1) return (0);
 	if (fmt->gcr_g64.rd.flags & FLAG_STRIP_TRACK) if (gcr_g64_strip_track(&ffo_l1_tmp, &fmt->gcr_g64, ffo_l1, limit) == -1) return (0);
@@ -427,20 +433,21 @@ gcr_g64_write_track(
 
 #define MAGIC_STRIP_TRACK		1
 #define MAGIC_ALIGN_TRACK		2
-#define MAGIC_PAD_LENGTH1		3
-#define MAGIC_PAD_LENGTH2		4
-#define MAGIC_HEADER_RAW_ID		5
-#define MAGIC_SPEED			6
-#define MAGIC_PROLOG_LENGTH		7
-#define MAGIC_EPILOG_LENGTH		8
-#define MAGIC_PRECOMP0			9
-#define MAGIC_PRECOMP1			10
-#define MAGIC_PRECOMP2			11
-#define MAGIC_PRECOMP3			12
-#define MAGIC_BOUNDS0			13
-#define MAGIC_BOUNDS1			14
-#define MAGIC_BOUNDS2			15
-#define MAGIC_BOUNDS3			16
+#define MAGIC_POSTCOMP			3
+#define MAGIC_PAD_LENGTH1		4
+#define MAGIC_PAD_LENGTH2		5
+#define MAGIC_HEADER_RAW_ID		6
+#define MAGIC_SPEED			7
+#define MAGIC_PROLOG_LENGTH		8
+#define MAGIC_EPILOG_LENGTH		9
+#define MAGIC_PRECOMP0			10
+#define MAGIC_PRECOMP1			11
+#define MAGIC_PRECOMP2			12
+#define MAGIC_PRECOMP3			13
+#define MAGIC_BOUNDS0			14
+#define MAGIC_BOUNDS1			15
+#define MAGIC_BOUNDS2			16
+#define MAGIC_BOUNDS3			17
 
 
 
@@ -521,6 +528,7 @@ gcr_g64_set_read_option(
 	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_STRIP_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_STRIP_TRACK));
 	if (magic == MAGIC_ALIGN_TRACK)   return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_ALIGN_TRACK));
+	if (magic == MAGIC_POSTCOMP)      return (setvalue_uchar_bit(&fmt->gcr_g64.rd.flags, val, FLAG_POSTCOMP));
 	if (magic == MAGIC_PAD_LENGTH1)   return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length1, val, 0, 0xff));
 	if (magic == MAGIC_PAD_LENGTH2)   return (setvalue_uchar(&fmt->gcr_g64.rd.pad_length2, val, 0, 0xff));
 	if (magic == MAGIC_HEADER_RAW_ID) return (setvalue_uchar(&fmt->gcr_g64.rd.header_raw_id, val, 0, 0xff));
@@ -623,6 +631,7 @@ static struct format_option		gcr_g64_read_options[] =
 	{
 	FORMAT_OPTION_BOOLEAN("strip_track",   MAGIC_STRIP_TRACK,   1),
 	FORMAT_OPTION_BOOLEAN("align_track",   MAGIC_ALIGN_TRACK,   1),
+	FORMAT_OPTION_BOOLEAN("postcomp",      MAGIC_POSTCOMP,      1),
 	FORMAT_OPTION_INTEGER("pad_length1",   MAGIC_PAD_LENGTH1,   1),
 	FORMAT_OPTION_INTEGER("pad_length2",   MAGIC_PAD_LENGTH2,   1),
 	FORMAT_OPTION_INTEGER("header_raw_id", MAGIC_HEADER_RAW_ID, 1),

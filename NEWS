@@ -1,3 +1,32 @@
+cw 0.12-20070304
+	* support for Mac800K disks was added (thanks to Steve Ocepek,
+	  Oliver Stabel and Stefan A. Haubenthal for supplying raw images;
+	  thanks to Oliver Stabel for giving the useful hint to look at the
+	  MESS source http://www.mess.org/, especially the file ap_dsk35.c;
+	  thanks to Steve Ocepek for testing the images with a real Mac)
+	* added configuration mac_dd_800 and mac_dd_800_524 for Mac800
+	  disks. while mac_dd_800_524 writes out all 524 bytes of a sector,
+	  mac_dd_800 gives back 512 bytes per sector. this format is
+	  understood by "Mini vMac" (http://minivmac.sourceforge.net/).
+	  usually the additional 12 bytes in mac_dd_800_524 are not used very
+	  often
+	* the handling of sector interleave changed. because it is currently
+	  only used with the newly introduced mac_dd-formats other formats
+	  are not affected
+	* a small GUI for cwtool is now available in the contrib/ directory
+	  (written by David Bentham a.k.a PegXlin DEV). it uses kaptain and
+	  is currently able to read and write Amiga and MSDOS disks
+	* while searching for drives the motor is now turned on, because some
+	  drives will not seek without this (especially 8" drives, thanks
+	  to Jay Jaeger for pointing that out)
+	* corrected calculation of the initial value for crc16 and removed
+	  wrong byte shift of the sector data in the FM format 
+	* added configuration ibm_dsdd, dec_rx01_sssd and dg_dsdd. these
+	  formats are used on 8" disks (thanks to Jay Jaeger for supplying
+	  raw images)
+	* changed configuration for msdos_dd_5.25 (thanks to Oliver Stabel
+	  for supplying a raw image)
+
 cw 0.11-20060806
 	* changed handling of raw images. raw images created with the current
 	  version are not compatible with earlier versions of cwtool, but it
@@ -11,7 +40,7 @@ cw 0.11-20060806
 	  the most out of them
 	* 'make install' should now add static entries for udev, but it was
 	  only tested with SuSE 10.0 and 10.1, please consult the README
-	* special support for D64 images with optionl error information was
+	* special support for D64 images with optional error information was
 	  added
 	* added configuration c1541_d64, c1541_40_d64 and c1541_42_d64 for
 	  D64 disk images with 35, 40 and 42 tracks
@@ -26,7 +55,8 @@ cw 0.11-20060806
 	  in future versions, the handling of drives with different rpm's
 	  may change again
 	* added configuration mac_5.25 for Apple IIe 5.25" disks (thanks
-	  to Stefan A. Haubenthal for supplying a raw image)
+	  to Stefan A. Haubenthal for supplying a raw image and to David
+	  Empson for giving helpful hints about the format)
 
 cw 0.10-20060215
 	* added configuration amiga_dd_5.25 for Amiga 5.25" DD (thanks to
@@ -36,7 +66,7 @@ cw 0.10-20060215
 	  per track are supported, please read the man page for more
 	* added configuration c1541_g64, c1541_40_g64 and c1541_42_g64 for
 	  G64 disk images with 35, 40 and 42 tracks
-	* added configuration c1541_42 for 42 Track C1541 images
+	* added configuration c1541_42 for 42 track C1541 images
 	* changed configuration for c1541 and c1541_40, but this should
 	  be only an issue if you want to use raw image files from earlier
 	  versions of cwtool, this change was needed to equalize track

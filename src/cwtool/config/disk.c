@@ -12,15 +12,15 @@
 
 #include <stdio.h>
 
-#include "config/disk.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "config.h"
 #include "disk.h"
-#include "format.h"
-#include "image.h"
-#include "string.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../config.h"
+#include "../disk.h"
+#include "../format.h"
+#include "../image.h"
+#include "../string.h"
 
 
 

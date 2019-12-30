@@ -105,7 +105,7 @@ check_char_major()
 modify_modules_conf()
 	{
 	if [ ! -e "$MODULES_CONF" ]; then
-		echo "file '$MODULES_CONF' not found"
+		echo "file '$MODULES_CONF' not found" 1>&2
 		return
 	fi
 	LINES="$(awk -v file="$MODULES_CONF" '{
@@ -141,9 +141,7 @@ modify_modules_conf()
 		echo "alias char-major-$MAJOR $MODULE_NAME"
 		echo "options $MODULE_NAME cw_major=$MAJOR"
 		} >> "$MODULES_CONF"
-	fi &&
-	echo "executing depmod" &&
-	depmod -q -a || exit 1
+	fi
 	}
 
 
@@ -154,7 +152,7 @@ modify_modules_conf()
 cleanup_modules_conf()
 	{
 	if [ ! -e "$MODULES_CONF" ]; then
-		echo "file '$MODULES_CONF' not found"
+		echo "file '$MODULES_CONF' not found" 1>&2
 		return
 	fi
 	echo "cleaning up '$MODULES_CONF'"
@@ -162,6 +160,72 @@ cleanup_modules_conf()
 		"$MODULES_CONF" > "$MODULES_CONF.tmp" &&
 	cat "$MODULES_CONF.tmp" > "$MODULES_CONF" &&
 	rm -f "$MODULES_CONF.tmp" || exit 1
+	}
+
+
+
+#############################################################################
+# modify_modprobe_d
+#############################################################################
+modify_modprobe_d()
+	{
+	if [ ! -d "$MODULES_CONF" ]; then
+		echo "directory '$MODULES_CONF' not found" 1>&2
+		return
+	fi
+	if [ -e "$MODULES_CONF/catweasel" ]; then
+		echo "file '$MODULES_CONF/catweasel' already exists" 1>&2
+		exit 1
+	fi
+	echo "adding entries to '$MODULES_CONF/catweasel'"
+	{
+	echo "alias char-major-$MAJOR $MODULE_NAME"
+	echo "options $MODULE_NAME cw_major=$MAJOR"
+	} > "$MODULES_CONF/catweasel"
+	}
+
+
+
+#############################################################################
+# cleanup_modprobe_d
+#############################################################################
+cleanup_modprobe_d()
+	{
+	if [ ! -d "$MODULES_CONF" ]; then
+		echo "directory '$MODULES_CONF' not found"
+		return
+	fi
+	rm -f "$MODULES_CONF/catweasel"
+	}
+
+
+
+#############################################################################
+# modify_module_autoload
+#############################################################################
+modify_module_autoload()
+	{
+	if [ -d "$MODULES_CONF" ]; then
+		modify_modprobe_d
+	else
+		modify_modules_conf
+	fi
+	echo "executing depmod" &&
+	depmod -q -a || exit 1
+	}
+
+
+
+#############################################################################
+# cleanup_module_autoload
+#############################################################################
+cleanup_module_autoload()
+	{
+	if [ -d "$MODULES_CONF" ]; then
+		cleanup_modprobe_d
+	else
+		cleanup_modules_conf
+	fi
 	}
 
 
@@ -296,7 +360,10 @@ cleanup_static_devices()
 if [ -z "$MODULES_CONF" ]; then
 	VERSION="$(uname -r | awk 'BEGIN { FS="."; } { print($1 $2); }')"
 	MODULES_CONF="/etc/modules.conf"
-	[ "$VERSION" -ge "26" ] && MODULES_CONF="/etc/modprobe.conf"
+	if [ "$VERSION" -ge "26" ]; then
+		MODULES_CONF="/etc/modprobe.conf"
+		[ -e "$MODULES_CONF" ] || MODULES_CONF="/etc/modprobe.d"
+	fi
 fi
 MAN_DIR="$MAN_DIR/man1"
 
@@ -308,9 +375,10 @@ if [ "$PROGRAM_NAME" = "install.bash" ]; then
 	copy_file "module/cw.o" "$MODULE_DIR/$MODULE_NAME.o"
 	copy_file "module/cw.ko" "$MODULE_DIR/$MODULE_NAME.ko"
 	copy_file "doc/cwtool.1" "$MAN_DIR/cwtool.1"
-	modify_modules_conf
+	modify_module_autoload
 	create_device_nodes "/dev"
 	create_device_nodes "/lib/udev/devices"
+	create_device_nodes "/etc/udev/devices"
 	modify_static_devices
 elif [ "$PROGRAM_NAME" = "upgrade.bash" ]; then
 	write_uninstall_info
@@ -321,6 +389,7 @@ elif [ "$PROGRAM_NAME" = "upgrade.bash" ]; then
 	unload_module
 	create_device_nodes "/dev"
 	create_device_nodes "/lib/udev/devices"
+	create_device_nodes "/etc/udev/devices"
 	modify_static_devices
 else
 	[ -f .uninstall ] && . .uninstall
@@ -328,10 +397,12 @@ else
 	remove_file "$MODULE_DIR/$MODULE_NAME.o"
 	remove_file "$MODULE_DIR/$MODULE_NAME.ko"
 	remove_file "$MAN_DIR/cwtool.1"
-	cleanup_modules_conf
+	cleanup_module_autoload
 	unload_module
 	remove_device_nodes "/dev"
 	remove_device_nodes "/lib/udev/devices"
+	remove_device_nodes "/etc/udev/devices"
 	cleanup_static_devices
 fi
+exit 0
 ######################################################### Karsten Scheibler #

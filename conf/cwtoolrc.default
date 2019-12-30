@@ -7,6 +7,50 @@ disk "clear"
 	track_range 0 165 1 optional yes
 	}
 
+disk "pattern_14"
+	{
+	info "RAW, 14 MHz, 83 trks, 2 sides, CLEARS ALL TRACKS OF A DISK"
+	format "fill"
+	clock 14
+	timeout 500
+	indexed yes
+	write mode 1
+	track_range 0 165 1 optional yes
+	}
+
+disk "pattern_28"
+	{
+	info "RAW, 28 MHz, 83 trks, 2 sides, CLEARS ALL TRACKS OF A DISK"
+	format "fill"
+	clock 28
+	timeout 500
+	indexed yes
+	write mode 1
+	track_range 0 165 1 optional yes
+	}
+
+disk "raw_14i"
+	{
+	info "RAW, 14 MHz, indexed, 83 trks, 2 sides"
+	format "raw"
+	image "raw"
+	clock 14
+	timeout 420
+	indexed yes
+	track_range 0 165 1 optional yes
+	}
+
+disk "raw_28i"
+	{
+	info "RAW, 28 MHz, indexed, 83 trks, 2 sides"
+	format "raw"
+	image "raw"
+	clock 28
+	timeout 420
+	indexed yes
+	track_range 0 165 1 optional yes
+	}
+
 disk "raw_14"
 	{
 	info "RAW, 14 MHz, 83 trks, 2 sides"
@@ -59,6 +103,7 @@ disk "c1541"
 	{
 	info "C1541, GCR, 5.25 inch, 35 trks, 1 side, 17-21 sec/trk, 170 K"
 	side_offset 84
+	clock 14
 	track_range 1 69 2
 		{
 		format "fill"
@@ -66,7 +111,6 @@ disk "c1541"
 		write fill_length 16384
 		}
 	format "gcr_cbm"
-	clock 14
 	track_step 2
 	read timeout 180
 	write
@@ -904,8 +948,15 @@ disk "msdos_dd_5.25"
 	info "MSDOS, MFM, 5.25 inch, 40 trks, 2 sides, 9 sec/trk, 360 K"
 	format "mfm_nec765"
 	clock 14
+	track_step 2
 	sectors 9
 	read timeout 190
+	bounds
+		{
+		0x0800 0x16c4 0x1c00
+		0x1d00 0x2292 0x2700
+		0x2800 0x2e5e 0x4000
+		}
 	write
 		{
 		timeout 500
@@ -1193,7 +1244,12 @@ disk "mac_5.25"
 	write
 		{
 		timeout 300
-		indexed 1
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
 		}
 	bounds
 		{
@@ -1204,8 +1260,262 @@ disk "mac_5.25"
 	track_range 0 136 4 { }
 	}
 
+disk "mac_dd_800"
+	{
+	info "Apple, GCR, 3.5  inch, 80 trks, 2 sides, 8-12 sec/trk, 800K"
+	format "gcr_apple"
+	clock 14
+	mode 1
+	volume_id 0x22
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
+	write
+		{
+		timeout 500
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length1 30
+		prolog_length 2048
+		}
+	track_range 0 31 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1300 0x1a00
+			0x1b00 0x2500 0x2d00
+			0x2e00 0x3700 0x7000
+			}
+		write precomp
+			{
+			+0x0000 +0x01c0 +0x01c0
+			-0x01c0 +0x0000 +0x0000
+			-0x01c0 +0x0000 +0x0000
+			}
+		sectors 12
+		}
+	track_range 32 63 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1400 0x1c00
+			0x1d00 0x2700 0x2f00
+			0x3000 0x3a00 0x7000
+			}
+		write precomp
+			{
+			+0x0000 +0x0180 +0x0180
+			-0x0180 +0x0000 +0x0000
+			-0x0180 +0x0000 +0x0000
+			}
+		sectors 11
+		}
+	track_range 64 95 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1700 0x2100
+			0x2200 0x2d00 0x3700
+			0x3800 0x4300 0x7000
+			}
+		sectors 10
+		}
+	track_range 96 127 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1a00 0x2400
+			0x2500 0x3100 0x3c00
+			0x3d00 0x4900 0x7000
+			}
+		sectors 9
+		}
+	track_range 128 159 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1c00 0x2800
+			0x2900 0x3700 0x4300
+			0x4400 0x5200 0x7000
+			}
+		sectors 8
+		}
+	}
+
+disk "mac_dd_800_524"
+	{
+	info "Apple, GCR, 3.5  inch, 80 trks, 2 sides, 8-12 sec/trk, 800K"
+	format "gcr_apple"
+	clock 14
+	mode 2
+	volume_id 0x22
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
+	write
+		{
+		timeout 500
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length1 30
+		prolog_length 2048
+		}
+	track_range 0 31 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1300 0x1a00
+			0x1b00 0x2500 0x2d00
+			0x2e00 0x3700 0x7000
+			}
+		write precomp
+			{
+			+0x0000 +0x01c0 +0x01c0
+			-0x01c0 +0x0000 +0x0000
+			-0x01c0 +0x0000 +0x0000
+			}
+		sectors 12
+		}
+	track_range 32 63 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1400 0x1c00
+			0x1d00 0x2700 0x2f00
+			0x3000 0x3a00 0x7000
+			}
+		write precomp
+			{
+			+0x0000 +0x0180 +0x0180
+			-0x0180 +0x0000 +0x0000
+			-0x0180 +0x0000 +0x0000
+			}
+		sectors 11
+		}
+	track_range 64 95 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1700 0x2100
+			0x2200 0x2d00 0x3700
+			0x3800 0x4300 0x7000
+			}
+		sectors 10
+		}
+	track_range 96 127 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1a00 0x2400
+			0x2500 0x3100 0x3c00
+			0x3d00 0x4900 0x7000
+			}
+		sectors 9
+		}
+	track_range 128 159 1
+		{
+		interleave 1
+		bounds
+			{
+			0x0800 0x1c00 0x2800
+			0x2900 0x3700 0x4300
+			0x4400 0x5200 0x7000
+			}
+		sectors 8
+		}
+	}
+
+disk "mac_dd"
+	{
+	info "same as mac_dd_800"
+	copy "mac_dd_800"
+	}
+
+disk "mac_dd_524"
+	{
+	info "same as mac_dd_800_524"
+	copy "mac_dd_800_524"
+	}
+
 disk "mac_hd"
 	{
 	info "same as msdos_hd"
 	copy "msdos_hd"
 	}
+
+disk "ibm_dsdd"
+	{
+	info "MFM, 8 inch, 77 trks, 2 sides, 26 sec/track, track 0 side 0 FM"
+	format "fm_nec765"
+	clock 28
+	sectors 26
+	read timeout 300
+	track 0 { }
+	format "mfm_nec765"
+	clock  28
+	sectors 26
+	sector_sizes
+		{
+		256 256 256 256 256 256 256 256
+		256 256 256 256 256 256 256 256
+		256 256 256 256 256 256 256 256
+		256 256
+		}
+	read timeout 300
+	track_range 1 4 1 write
+		{
+		timeout 500
+		epilog_length 2048
+		}
+	}
+
+disk "dec_rx01_sssd"
+         {
+         info "FM,  8 inch, 77 trks, 1 side, 26 sec/trk"
+         format "fm_nec765"
+         clock 28
+         sectors 26
+         read timeout 300
+         write
+                 {
+                 timeout 500
+                 epilog_length 1024
+                 }
+         track_range 0 152 2 { }
+         }
+
+disk "dg_dsdd"
+         {
+         info "MFM, 8 inch, 77 trks, 2 sides, 15 sec/trk"
+         format "mfm_nec765"
+         clock 28
+         sectors 15
+         read timeout 300
+         write
+                 {
+                 timeout 500
+                 epilog_length 1024
+                 }
+         track_range 0 4 1 { }
+         }

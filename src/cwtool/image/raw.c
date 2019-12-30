@@ -12,16 +12,16 @@
 
 #include <stdio.h>
 
-#include "image/raw.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "fifo.h"
-#include "file.h"
-#include "image.h"
-#include "import.h"
-#include "export.h"
+#include "raw.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../fifo.h"
+#include "../file.h"
+#include "../image.h"
+#include "../import.h"
+#include "../export.h"
 
 
 

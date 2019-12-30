@@ -50,5 +50,5 @@ ${TARGET24}: ${OBJECTS} cwfirmware.c
 
 clean:
 	if [ "${VERSION}" = "26" ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
-	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} cwmain.c cwfirmware.c *~ *.bak *.ko
+	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} cwmain.c cwfirmware.c *~ *.bak *.ko Module.symvers
 endif

@@ -12,13 +12,13 @@
 
 #include <stdio.h>
 
-#include "image/plain.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "fifo.h"
-#include "file.h"
-#include "image.h"
+#include "plain.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../fifo.h"
+#include "../file.h"
+#include "../image.h"
 
 
 

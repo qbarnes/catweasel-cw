@@ -13,8 +13,8 @@
 #ifndef CWTOOL_FM_NEC765_H
 #define CWTOOL_FM_NEC765_H
 
-#include "cwtool.h"
-#include "format/bounds.h"
+#include "../cwtool.h"
+#include "bounds.h"
 
 struct fm_nec765
 	{
@@ -60,6 +60,16 @@ struct fm_nec765
 		struct bounds		bnd[2];
 		}			rw;
 	};
+
+/*
+ * do not put this include at the beginning of the file, because ../format.h
+ * also includes this file to construct union format. so the above struct
+ * has to be known at time of inclusion
+ */
+
+#include "../format.h"
+
+extern struct format_desc		fm_nec765_format_desc;
 
 
 

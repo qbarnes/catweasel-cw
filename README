@@ -8,14 +8,15 @@ eMail:    cw@unusedino.de
   =======================
 
 
-cw is (yet another) package for the Catweasel controller, look under [5] what
-other packages do exist. This package is especially for accessing the floppy
+cw is (yet another) package for the Catweasel controller, look under [6] for
+other existing packages. This package is especially for accessing the floppy
 drives connected to Catweasel. Currently the MK3 and MK4 controller cards
 are supported. cw consists of a kernel driver and a companion user space
-program. The kernel driver should work with Linux 2.4 and 2.6. Look at the
-homepage of the manufacturer http://www.jschoenfeld.com/ for more details
-about the controller features. Please see also [4] for some oddities you
-should know about disk drives.
+program (cwtool). The kernel driver should work with Linux 2.4 and 2.6. Look
+at the homepage of the manufacturer http://www.jschoenfeld.com/ for more
+details about the controller features. Please see also [4] for some hardware
+oddities you should know about, before complaining that something does not
+work as expected.
 
 
   ============================
@@ -23,13 +24,13 @@ should know about disk drives.
   ============================
 
 
-To build cw a simple 'make' should be enough, remember that you need the
+To build cw a simple 'make' should be enough. Remember that you need the
 header files from your running kernel in order to compile the driver module.
 cw was tested on x86 under different distributions with different Linux kernel
-versions (to name some: 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 all directly
+versions (to name a few: 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 all directly
 taken from http://www.kernel.org/), it was also succesfully compiled on
-Knoppix 4.0.2, SuSE 10.0 and SuSE 10.1. There were also reports, that cw
-successfully runs on PowerPC platforms under Linux.
+Knoppix 4.0.2, SuSE 10.0, 10.1 and 10.2. There were also reports, that cw
+runs on PowerPC platforms under Linux without problems.
 
 You may build cwtool with dietlibc, just set and export the environment
 variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
@@ -50,18 +51,8 @@ NOTE: The file conf/cwtoolrc.default contains the configuration for all
       description how such a file has to look like, because the syntax may
       change in future versions. For easy changes such as a different number
       of sectors per track you should use conf/cwtoolrc.default as a
-      template. If you write disks you may find the directives 'skew' and
-      'interleave' interesting to change the sector order on writing, both
-      expect a positive decimal number. You may experiment with the
-      following command (yes the line break is ok, but you may also write it
-      in one line):
-
-      # cwtool -W -v -v -e 'disk "test" { format "gcr_cbm" sectors 21
-            skew 0 interleave 0 track 0 { } }' test /dev/zero /dev/null
-
-      First change the number after 'skew' and then after 'interleave'
-      to see the effect. You may also write the string after option -e to a
-      file and use the option -f to let cwtool read this file.
+      template. But be prepared that you have to do your changes again with
+      new versions of cwtool.
 
 NOTE: If you use devfs you have to determine yourself how to add the device
       nodes permanently, because devfs will be removed in future versions of
@@ -119,9 +110,9 @@ manually:
 
 If you use 'make install' to install cw then /etc/modules.conf (Linux 2.4)
 or /etc/modprobe.conf (Linux 2.6) will be modified to allow automatic module
-loading. Per default it uses char major number 120, if this major number is
-already in use (look at /proc/devices) you need to choose a different number,
-use the command 'make install MAJOR=xx', where xx is a free char major number
+loading. Per default it uses char major number 120. If this major number is
+already in use (look at /proc/devices) you need to choose a different number.
+Use the command 'make install MAJOR=xx', where xx is a free char major number
 on your system. The following parameters are also possible, if these
 parameters are not specified more or less useful default values are used.
 
@@ -130,27 +121,37 @@ MAN_DIR             - the man page will be copied to $MAN_DIR/man1
 MODULE_DIR          - directory in which the kernel driver module is
                       installed
 MODULE_NAME         - the name of the module (you need to choose a different
-                      name than 'cw' if you also use the catweasel package)
+                      name than 'cw' if you also use the catweasel package
+		      listed in [6])
 MODULES_CONF        - full path of the modules.conf or modprobe.conf file
+                      or alternatively the modprobe.d directory if no
+		      modprobe.conf exists
 UDEV_STATIC_DEVICES - this file contains static entries for device nodes,
                       if it exists entries suitable for cw are added
-		      (seems only to exist on SuSE 10.0 and not 10.1)
+		      (seems only to exist on SuSE 10.0)
 
 NOTE: You may use 'make upgrade' if you want to upgrade from an older
       version of cw, but you need to specify those parameters that differ
       from the default values. Upgrading just means overwriting cwtool, the
       kernel module and the man page with the current versions and creating
-      device nodes if needed.
+      device nodes if necessary. Be aware that this has not been extensively
+      tested. If possible uninstall your old version of cw and install the
+      new one.
 
 NOTE: You may use 'make uninstall' to uninstall cw, the parameters of
       the last 'make install' call are saved and are used for uninstalling,
       but after a 'make clean' these saved parameters will be lost.
 
 
-  =======================
-  [4] DISK DRIVE ODDITIES
-  =======================
+  =====================
+  [4] HARDWARE ODDITIES
+  =====================
 
+
+Cabling
+-------
+Do not use long floppy cables. They worsen signal quality and may produce
+errors you won't get with shorter cables.
 
 5.25" drives and C1541
 ----------------------
@@ -165,7 +166,8 @@ NOTE: older 360K drives seem to read data independently of the index pulse
 
 5.25" 360K drives
 -----------------
-Assume your 360K drive is on /dev/cw0raw0, then try the following:
+Assume your 360K drive is on /dev/cw0raw0, then try the following (yes the
+line break is ok, but you may also write it in one line):
 
 # cwtool -I -e 'drive "/dev/cw0raw0" { invert_diskchange yes
       double_step yes }'
@@ -173,14 +175,15 @@ Assume your 360K drive is on /dev/cw0raw0, then try the following:
 Those drives seem to give an inverted diskchange-signal and work with 300
 rpm instead of 360 rpm like the 1.2M ones. My 360K drive also reads data if
 no index pulse is present, so you do not need to modify such drives, just
-use the following command to configure the driver accordingly:
+use the following command to configure the driver accordingly (yes the line
+break is ok, but you may also write it in one line):
 
 # cwtool -I -e 'drive "/dev/cw0raw0" { ignore_diskchange yes
       double_step yes }'
 
 This instructs the driver to not check if an index pulse is present or not.
-But this means also the driver will not return an error if no disk is in the
-drive. You should now be able to read a C1541 disk:
+But this also means that the driver will not return an error if no disk is in
+the drive. You should now be able to read a C1541 disk:
 
 # cwtool -R -v c1541_300 /dev/cw0raw0 image.d64
 
@@ -250,18 +253,30 @@ Michael Krause's cwfloppy README:
        now? :-) ..."
 
 
+  =================
+  [5] CONTRIBUTIONS
+  =================
+
+
+In the contrib directory you will find a simple GUI for cwtool written by
+David Bentham (aka PegXlin DEV). If you want to use it, consult the according
+README in contrib/cwtoolgui. If you have enhancements for this GUI or other
+useful additions, please contact me under the mail address listed at the
+start of this README.
+
+
   ====================
-  [5] RELATED PROJECTS
+  [6] RELATED PROJECTS
   ====================
 
 
-There are at least 3 other Linux drivers for the Catweasel controller:
+There are at least 5 other Linux drivers for the Catweasel controller:
 
 catweasel (*) - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
 	Linux driver for SID, Joysticks and Amiga keyboard. If you also want
 	to use this package together with cw, remember to set MODULE_NAME to
 	a different name, because catweasel uses the same name for the driver
-	module (see the installation instructions below).
+	module (see the installation instructions in [3]).
 
 cwfloppy (*) - http://www.soundtracker.org/raw/cwfloppy/, written by
 	Michael Krause. A Linux driver for accessing the floppies on a
@@ -273,6 +288,14 @@ cwfloppy (*) - http://www.soundtracker.org/raw/cwfloppy/, written by
 	block device cw uses a char device and passes the raw Catweasel data
 	to the calling program, so all format routines do not reside in the
 	kernel driver anymore.
+
+hardsid (*) - http://hardsid.sourceforge.net/, written by Jarno Paananen
+	and Simon White. A Linux driver for the Hardsidcards and the
+	SID-Chips on Catweasel MK3 and MK4.
+
+hardsid-catweasel (*) - http://www.bel.fi/~alankila/blog/2005/12/30/HardSID-Catweasel%200.01.html,
+	written by Antti Lankila. This driver only contains support for
+	Catweasel MK4 cards and is a rework of the hardsid driver.
 
 cw2dmk - http://www.tim-mann.org/catweasel.html, written by Tim Mann.
 	A Linux driver (other platforms are also supported) for accessing the

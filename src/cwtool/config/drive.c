@@ -12,13 +12,13 @@
 
 #include <stdio.h>
 
-#include "config/drive.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "config.h"
 #include "drive.h"
-#include "string.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../config.h"
+#include "../drive.h"
+#include "../string.h"
 
 
 

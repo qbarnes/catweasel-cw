@@ -34,18 +34,13 @@
 /*
  * if structure or semantics of data changes, which is exchanged between
  * the driver and cwtool, then CW_STRUCT_VERSION is increased. so only
- * matching driver and cwtool versions work together:
+ * matching driver and cwtool versions work together
  *
  *  0    cw-0.08 - cw-0.10
  *  1    cw-0.11 -
  */
 
 #define CW_STRUCT_VERSION		1
-
-/*
- * UGLY: should be CW_NR_TRACKS or 85, because 86 is never reached, but other
- *       max-parameters use the last value, like CW_MAX_SETTLE_TIME
- */
 
 #define CW_MAX_TRACK			86
 #define CW_MAX_SIDE			2

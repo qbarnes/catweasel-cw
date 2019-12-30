@@ -42,17 +42,17 @@
 
 #include <stdio.h>
 
-#include "format/tbe_cw.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "disk.h"
-#include "fifo.h"
-#include "format.h"
-#include "format/raw.h"
-#include "format/tbe.h"
-#include "format/setvalue.h"
+#include "tbe_cw.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../format.h"
+#include "raw.h"
+#include "tbe.h"
+#include "setvalue.h"
 
 
 
@@ -510,7 +510,7 @@ tbe_cw_statistics(
 	int				track)
 
 	{
-	raw_histogram(ffo_l0, track);
+	raw_histogram(ffo_l0, track, track);
 	raw_precomp_statistics(ffo_l0, fmt->tbe_cw.rw.bnd, 6);
 	return (1);
 	}

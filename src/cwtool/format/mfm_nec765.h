@@ -13,8 +13,8 @@
 #ifndef CWTOOL_MFM_NEC765_H
 #define CWTOOL_MFM_NEC765_H
 
-#include "cwtool.h"
-#include "format/bounds.h"
+#include "../cwtool.h"
+#include "bounds.h"
 
 struct mfm_nec765
 	{
@@ -52,15 +52,26 @@ struct mfm_nec765
 		unsigned char		sync_length;
 		unsigned short		sync_value;
 		unsigned short		crc16_init_value;
-		unsigned short		reserved;
+		unsigned char		reserved;
 		unsigned char		flags;
 		unsigned char		id_address_mark;
 		unsigned char		data_address_mark1;
 		unsigned char		data_address_mark2;
+		unsigned char		track_step;
 		unsigned char		pshift[(CWTOOL_MAX_SECTOR + 1) / 2];
 		struct bounds		bnd[3];
 		}			rw;
 	};
+
+/*
+ * do not put this include at the beginning of the file, because ../format.h
+ * also includes this file to construct union format. so the above struct
+ * has to be known at time of inclusion
+ */
+
+#include "../format.h"
+
+extern struct format_desc		mfm_nec765_format_desc;
 
 
 

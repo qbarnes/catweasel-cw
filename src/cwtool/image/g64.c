@@ -14,15 +14,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "image/g64.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "fifo.h"
-#include "file.h"
-#include "image.h"
-#include "import.h"
-#include "export.h"
+#include "g64.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../fifo.h"
+#include "../file.h"
+#include "../image.h"
+#include "../import.h"
+#include "../export.h"
 
 
 
@@ -252,7 +252,10 @@ image_g64_write_data(
 		file_write(&img_g64->fil, buffer, 2);
 		file_write(&img_g64->fil, img_g64->trk[t].data, s);
 
-		/* write fill bytes (if needed) */
+		/*
+		 * write fill bytes (if needed). use 0xaa as fill value in
+		 * case the last two bits were already zero
+		 */
 
 		image_g64_write_fill(img_g64, 0xaa, max_track_size - s);
 		}

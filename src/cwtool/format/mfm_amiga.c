@@ -12,17 +12,17 @@
 
 #include <stdio.h>
 
-#include "format/mfm_amiga.h"
-#include "error.h"
-#include "debug.h"
-#include "verbose.h"
-#include "cwtool.h"
-#include "disk.h"
-#include "fifo.h"
-#include "format.h"
-#include "format/mfm.h"
-#include "format/raw.h"
-#include "format/setvalue.h"
+#include "mfm_amiga.h"
+#include "../error.h"
+#include "../debug.h"
+#include "../verbose.h"
+#include "../cwtool.h"
+#include "../disk.h"
+#include "../fifo.h"
+#include "../format.h"
+#include "mfm.h"
+#include "raw.h"
+#include "setvalue.h"
 
 
 
@@ -40,6 +40,7 @@
 #define FLAG_IGNORE_CHECKSUMS		(1 << 0)
 #define FLAG_IGNORE_TRACK_MISMATCH	(1 << 1)
 #define FLAG_IGNORE_FORMAT_BYTE		(1 << 2)
+#define FLAG_POSTCOMP			(1 << 3)
 
 
 
@@ -260,8 +261,9 @@ mfm_amiga_statistics(
 	int				track)
 
 	{
-	raw_histogram(ffo_l0, track);
+	raw_histogram(ffo_l0, track, track);
 	raw_precomp_statistics(ffo_l0, fmt->mfm_amg.rw.bnd, 3);
+	if (fmt->mfm_amg.rd.flags & FLAG_POSTCOMP) raw_postcomp_histogram(ffo_l0, fmt->mfm_amg.rw.bnd, 3, track, track);
 	return (1);
 	}
 
@@ -282,6 +284,7 @@ mfm_amiga_read_track(
 	unsigned char			data[CWTOOL_MAX_TRACK_SIZE];
 	struct fifo			ffo_l1 = FIFO_INIT(data, sizeof (data));
 
+	if (fmt->mfm_amg.rd.flags & FLAG_POSTCOMP) raw_postcomp(ffo_l0, fmt->mfm_amg.rw.bnd, 3);
 	raw_read(ffo_l0, &ffo_l1, fmt->mfm_amg.rw.bnd, 3);
 	while (mfm_amiga_read_sector(&ffo_l1, &fmt->mfm_amg, dsk_sct, track) != -1) ;
 	return (1);
@@ -329,18 +332,19 @@ mfm_amiga_write_track(
 #define MAGIC_IGNORE_CHECKSUMS		1
 #define MAGIC_IGNORE_TRACK_MISMATCH	2
 #define MAGIC_IGNORE_FORMAT_BYTE	3
-#define MAGIC_PROLOG_LENGTH		4
-#define MAGIC_PROLOG_VALUE		5
-#define MAGIC_EPILOG_LENGTH		6
-#define MAGIC_EPILOG_VALUE		7
-#define MAGIC_FILL_LENGTH		8
-#define MAGIC_FILL_VALUE		9
-#define MAGIC_PRECOMP			10
-#define MAGIC_SECTORS			11
-#define MAGIC_SYNC_LENGTH		12
-#define MAGIC_SYNC_VALUE		13
-#define MAGIC_FORMAT_BYTE		14
-#define MAGIC_BOUNDS			15
+#define MAGIC_POSTCOMP			4
+#define MAGIC_PROLOG_LENGTH		5
+#define MAGIC_PROLOG_VALUE		6
+#define MAGIC_EPILOG_LENGTH		7
+#define MAGIC_EPILOG_VALUE		8
+#define MAGIC_FILL_LENGTH		9
+#define MAGIC_FILL_VALUE		10
+#define MAGIC_PRECOMP			11
+#define MAGIC_SECTORS			12
+#define MAGIC_SYNC_LENGTH		13
+#define MAGIC_SYNC_VALUE		14
+#define MAGIC_FORMAT_BYTE		15
+#define MAGIC_BOUNDS			16
 
 
 
@@ -403,8 +407,9 @@ mfm_amiga_set_read_option(
 	debug(2, "setting read option magic = %d, val = %d, ofs = %d", magic, val, ofs);
 	if (magic == MAGIC_IGNORE_CHECKSUMS)      return (setvalue_uchar_bit(&fmt->mfm_amg.rd.flags, val, FLAG_IGNORE_CHECKSUMS));
 	if (magic == MAGIC_IGNORE_TRACK_MISMATCH) return (setvalue_uchar_bit(&fmt->mfm_amg.rd.flags, val, FLAG_IGNORE_TRACK_MISMATCH));
-	debug_error_condition(magic != MAGIC_IGNORE_FORMAT_BYTE);
-	return (setvalue_uchar_bit(&fmt->mfm_amg.rd.flags, val, FLAG_IGNORE_FORMAT_BYTE));
+	if (magic == MAGIC_IGNORE_FORMAT_BYTE)    return (setvalue_uchar_bit(&fmt->mfm_amg.rd.flags, val, FLAG_IGNORE_FORMAT_BYTE));
+	debug_error_condition(magic != MAGIC_POSTCOMP);
+	return (setvalue_uchar_bit(&fmt->mfm_amg.rd.flags, val, FLAG_POSTCOMP));
 	}
 
 
@@ -505,6 +510,7 @@ static struct format_option		mfm_amiga_read_options[] =
 	FORMAT_OPTION_BOOLEAN("ignore_checksums",      MAGIC_IGNORE_CHECKSUMS,      1),
 	FORMAT_OPTION_BOOLEAN("ignore_track_mismatch", MAGIC_IGNORE_TRACK_MISMATCH, 1),
 	FORMAT_OPTION_BOOLEAN("ignore_format_byte",    MAGIC_IGNORE_FORMAT_BYTE,    1),
+	FORMAT_OPTION_BOOLEAN("postcomp",              MAGIC_POSTCOMP,              1),
 	FORMAT_OPTION_END
 	};
 

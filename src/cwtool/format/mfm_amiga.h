@@ -13,7 +13,7 @@
 #ifndef CWTOOL_MFM_AMIGA_H
 #define CWTOOL_MFM_AMIGA_H
 
-#include "format/bounds.h"
+#include "bounds.h"
 
 struct mfm_amiga
 	{
@@ -43,6 +43,16 @@ struct mfm_amiga
 		struct bounds		bnd[3];
 		}			rw;
 	};
+
+/*
+ * do not put this include at the beginning of the file, because ../format.h
+ * also includes this file to construct union format. so the above struct
+ * has to be known at time of inclusion
+ */
+
+#include "../format.h"
+
+extern struct format_desc		mfm_amiga_format_desc;
 
 
 

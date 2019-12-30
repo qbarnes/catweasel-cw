@@ -13,8 +13,8 @@
 #ifndef CWTOOL_MFMFM_H
 #define CWTOOL_MFMFM_H
 
-#include "import.h"
-#include "export.h"
+#include "../import.h"
+#include "../export.h"
 
 struct fifo;
 struct disk_error;

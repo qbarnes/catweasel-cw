@@ -48,7 +48,7 @@ disk_sectors_init(
 	struct disk_sector		dsk_sct2[CWTOOL_MAX_SECTOR];
 	unsigned char			*data      = fifo_get_data(ffo);
 	int				skew       = dsk_trk->skew;
-	int				interleave = dsk_trk->interleave;
+	int				interleave = dsk_trk->interleave + 1;
 	int				errors     = 0x7fffffff;
 	int				sectors, size, i, j;
 
@@ -77,11 +77,15 @@ disk_sectors_init(
 	if (write) fifo_set_limit(ffo, size);
 	else if (sectors > 0) fifo_set_wr_ofs(ffo, size);
 
-	/* on write apply sector shuffling according to skew and interleave */
+	/*
+	 * on write apply sector shuffling according to skew and interleave.
+	 * current calculation will fail if (sectors / interleave < 2), so it
+	 * is applied only if (sectors / interleave >= 2)
+	 */
 
 	for (i = 0; i < sectors; i++)
 		{
-		if (write) j = (skew + i * (interleave + 1)) % sectors;
+		if ((write) && (sectors / interleave >= 2)) j = (skew + (i / interleave) + ((i % interleave) * sectors + interleave - 1) / interleave) % sectors;
 		else j = i;
 		dsk_sct[i] = dsk_sct2[j];
 		}

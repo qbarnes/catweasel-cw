@@ -13,7 +13,7 @@
 #ifndef CWTOOL_IMAGE_PLAIN_H
 #define CWTOOL_IMAGE_PLAIN_H
 
-#include "file.h"
+#include "../file.h"
 
 struct image_plain
 	{

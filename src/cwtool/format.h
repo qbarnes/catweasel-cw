@@ -13,6 +13,7 @@
 #ifndef CWTOOL_FORMAT_H
 #define CWTOOL_FORMAT_H
 
+#include "format/raw.h"
 #include "format/gcr_g64.h"
 #include "format/gcr_cbm.h"
 #include "format/gcr_apple.h"
