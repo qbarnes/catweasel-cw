@@ -1,0 +1,505 @@
+disk "raw_14"
+	{
+	info "RAW, 14 MHz, 83 trks, 2 sides"
+	format "raw"
+	image "raw"
+	clock 14
+	timeout 420
+	track_range 0 165 1 { }
+	}
+
+disk "raw_28"
+	{
+	info "RAW, 28 MHz, 83 trks, 2 sides"
+	format "raw"
+	image "raw"
+	clock 28
+	timeout 420
+	track_range 0 165 1 { }
+	}
+
+disk "raw_56"
+	{
+	info "RAW, 56 MHz, 83 trks, 2 sides"
+	format "raw"
+	image "raw"
+	clock 56
+	timeout 420
+	track_range 0 165 1 { }
+	}
+
+disk "c1541"
+	{
+	info "C1541, GCR, 5.25 inch, 35 trks, 1 side, 17-21 sec/trk, 170 K"
+	format "gcr_cbm"
+	clock 14
+	read timeout 180
+	write
+		{
+		timeout 300
+		prolog_length 2048
+		}
+	track_range 0 64 4
+		{
+		bounds
+			{
+			0x0800 0x1400 0x1c00
+			0x1d00 0x2500 0x2c00
+			0x2d00 0x3800 0x4000
+			}
+		sectors 21
+		}
+	track_range 68 92 4
+		{
+		bounds
+			{
+			0x0800 0x1600 0x1e00
+			0x1f00 0x2800 0x3200
+			0x3300 0x3d00 0x4800
+			}
+		sectors 19
+		}
+	track_range 96 116 4
+		{
+		bounds
+			{
+			0x0800 0x1700 0x2000
+			0x2100 0x2b00 0x3400
+			0x3500 0x4200 0x5000
+			}
+		sectors 18
+		}
+	track_range 120 136 4
+		{
+		bounds
+			{
+			0x0800 0x1900 0x2200
+			0x2300 0x2e00 0x3900
+			0x3a00 0x4700 0x5800
+			}
+		sectors 17
+		}
+	}
+
+disk "c1541_40"
+	{
+	info "C1541, GCR, 5.25 inch, 40 trks, 1 side, 17-21 sec/trk, 192 K"
+	copy "c1541"
+	track_range 140 156 4
+		{
+		bounds
+			{
+			0x0800 0x1900 0x2200
+			0x2300 0x2e00 0x3900
+			0x3a00 0x4700 0x5800
+			}
+		sectors 17
+		}
+	}
+
+disk "c1571"
+	{
+#	info "C1571, GCR, 5.25 inch, 35 trks, 2 sides, 17-21 sec/trk, 341 K"
+	info "C1571, GCR, 5.25 inch, 35 trks, 2 sides, *** UNTESTED ***"
+	format "gcr_cbm"
+	clock 14
+	read timeout 180
+	write
+		{
+		timeout 300
+		prolog_length 2048
+		}
+	bounds
+		{
+		0x0800 0x1400 0x1c00
+		0x1d00 0x2500 0x2c00
+		0x2d00 0x3800 0x4000
+		}
+	sectors 21
+	track_range 0 64 4 { }
+	track_range 1 65 4 { }
+	bounds
+		{
+		0x0800 0x1600 0x1e00
+		0x1f00 0x2800 0x3200
+		0x3300 0x3d00 0x4800
+		}
+	sectors 19
+	track_range 68 92 4 { }
+	track_range 69 93 4 { }
+	bounds
+		{
+		0x0800 0x1700 0x2000
+		0x2100 0x2b00 0x3400
+		0x3500 0x4200 0x5000
+		}
+	sectors 18
+	track_range 96 116 4 { }
+	track_range 97 117 4 { }
+	bounds
+		{
+		0x0800 0x1900 0x2200
+		0x2300 0x2e00 0x3900
+		0x3a00 0x4700 0x5800
+		}
+	sectors 17
+	track_range 120 136 4 { }
+	track_range 121 137 4 { }
+	}
+
+disk "c1571_40"
+	{
+#	info "C1571, GCR, 5.25 inch, 40 trks, 2 sides, 17-21 sec/trk, 384 K"
+	info "C1571, GCR, 5.25 inch, 40 trks, 2 sides, *** UNTESTED ***"
+	copy "c1571"
+	track_range 140 156 4 { }
+	track_range 141 157 4 { }
+	}
+
+disk "c1581_dd"
+	{
+#	info "C1581, MFM, 3.5  inch, 80 trks, 2 sides, 10 sec/trk, 800 K"
+	info "C1581, MFM, 3.5  inch, 80 trks, 2 sides, *** UNTESTED ***"
+	format "mfm_nec765"
+	clock 14
+	sectors 10
+	read timeout 230
+	flip_side yes
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		}
+	}
+
+disk "amiga_dd"
+	{
+	info "Amiga, MFM, 3.5  inch, 80 trks, 2 sides, 11 sec/trk, 880 K"
+	format "mfm_amiga"
+	clock 14
+	sectors 11
+	read timeout 230
+	write
+		{
+		timeout 300
+		prolog_length 1024
+		}
+	track_range 0 79 1 { }
+	track_range 80 159 1 write precomp
+		{
+		+0x0000 +0x0100 +0x0100
+		-0x0100 +0x0000 +0x0000
+		-0x0100 +0x0000 +0x0000
+		}
+	}
+
+disk "amiga_hd"
+	{
+	info "Amiga, MFM, 3.5  inch, 80 trks, 2 sides, 22 sec/trk, 1660 K"
+	format "mfm_amiga"
+	clock 28
+	sectors 22
+	read timeout 215
+	write
+		{
+		timeout 300
+		prolog_length 2048
+		}
+	track_range 0 79 1 { }
+	track_range 80 159 1 write precomp
+		{
+		+0x0000 +0x0100 +0x0100
+		-0x0100 +0x0000 +0x0000
+		-0x0100 +0x0000 +0x0000
+		}
+	}
+
+disk "msdos_dd_5.25"
+	{
+	info "MSDOS, MFM, 5.25 inch, 40 trks, 2 sides, 9 sec/trk, 360 K"
+	format "mfm_nec765"
+	clock 14
+	sectors 9
+	read timeout 190
+	write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		epilog_length 1024
+		}
+	track_range 0 156 4 { }
+	track_range 1 157 4 { }
+	}
+
+disk "msdos_dd"
+	{
+	info "MSDOS, MFM, 3.5  inch, 80 trks, 2 sides, 9 sec/trk, 720 K"
+	format "mfm_nec765"
+	clock 14
+	sectors 9
+	read timeout 230
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		epilog_length 1024
+		}
+	}
+
+disk "msdos_hd_5.25"
+	{
+	info "MSDOS, MFM, 5.25 inch, 80 trks, 2 sides, 15 sec/trk, 1200 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 15
+	read timeout 215
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd"
+	{
+	info "MSDOS, MFM, 3.5  inch, 80 trks, 2 sides, 18 sec/trk, 1440 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 18
+	read timeout 215
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1476"
+	{
+	info "MSDOS, MFM, 3.5  inch, 82 trks, 2 sides, 18 sec/trk, 1476 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 18
+	read timeout 215
+	track_range 0 163 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1494"
+	{
+	info "MSDOS, MFM, 3.5  inch, 83 trks, 2 sides, 18 sec/trk, 1494 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 18
+	read timeout 215
+	track_range 0 165 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1600"
+	{
+	info "MSDOS, MFM, 3.5  inch, 80 trks, 2 sides, 20 sec/trk, 1600 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 20
+	read timeout 215
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length2 44
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1680"
+	{
+	info "MSDOS, MFM, 3.5  inch, 80 trks, 2 sides, 21 sec/trk, 1680 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 21
+	read timeout 215
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length2 12
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1722"
+	{
+	info "MSDOS, MFM, 3.5  inch, 82 trks, 2 sides, 21 sec/trk, 1722 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 21
+	read timeout 215
+	track_range 0 163 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length2 12
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1743"
+	{
+	info "MSDOS, MFM, 3.5  inch, 83 trks, 2 sides, 21 sec/trk, 1743 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 21
+	read timeout 215
+	track_range 0 165 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length2 12
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1760"
+	{
+	info "MSDOS, MFM, 3.5  inch, 80 trks, 2 sides, 11 sec/trk, 1760 K"
+	format "mfm_nec765"
+	clock 28
+	sectors 11
+	sector_sizes
+		{
+		1024 1024 1024 1024 1024 1024
+		1024 1024 1024 1024 1024
+		}
+	read timeout 225
+	track_range 0 159 1 write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length2 40
+		epilog_length 2048
+		}
+	}
+
+disk "msdos_hd_1802"
+	{
+	info "MSDOS, MFM, 3.5  inch, 82 trks, 2 sides, 11-19 sec/trk, 1802 K"
+	format "mfm_nec765"
+	clock 28
+	read timeout 225
+	write
+		{
+		timeout 500
+		indexed yes
+		precomp
+			{
+			+0x0000 +0x0100 +0x0100
+			-0x0100 +0x0000 +0x0000
+			-0x0100 +0x0000 +0x0000
+			}
+		fill_length2 40
+		epilog_length 2048
+		}
+	track 0 sectors 19
+	sectors 11
+	sector_sizes
+		{
+		1024 1024 1024 1024 1024 1024
+		1024 1024 1024 1024 1024
+		}
+	track_range 1 163 1 { }
+	}
+
+disk "atari_dd"
+	{
+	info "same as msdos_dd"
+	copy "msdos_dd"
+	}
+
+disk "atari_hd"
+	{
+	info "same as msdos_hd"
+	copy "msdos_hd"
+	}

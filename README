@@ -1,0 +1,202 @@
+Author:   Karsten Scheibler
+Homepage: http://unusedino.de/cw/
+eMail:    cw@unusedino.de
+
+
+  =======================
+  [1] GENERAL INFORMATION
+  =======================
+
+
+cw is (yet another) package for the Catweasel controller, look below what
+other packages do exist. This package is especially for accessing the floppy
+drives connected to Catweasel. Currently the MK3 and MK4 controller cards
+are supported. cw consists of a kernel driver and a companion user space
+program. The kernel driver should work with Linux 2.4 and 2.6. Look at the
+homepage of the manufacturer http://www.jschoenfeld.com/ for more details
+about the controller features.
+
+NOTE: There are 2 other Linux drivers for the Catweasel controller:
+
+      catweasel - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
+      Linux driver for SID, Joysticks and Amiga keyboard. If you also want
+      to use this package together with cw, remember to set MODULE_NAME to
+      a different name, because catweasel uses the same name for the driver
+      module (see the installation instructions below).
+
+      cwfloppy - http://www.soundtracker.org/raw/cwfloppy/, written by
+      Michael Krause. A Linux driver for accessing the floppies on a
+      Catweasel controller. This driver exports block devices, so you are
+      able to mount Amiga disks under Linux. Currently it supports Amiga
+      and MSDOS disks (and C1541 with a patch written by me). To support
+      more formats i found it more useful to use another method to export
+      data to user space, thats why i started my own driver. Instead of a
+      block device cw uses a char device and passes the raw Catweasel data
+      to the calling program, so all format routines do not reside in the
+      kernel driver anymore.
+
+      Currently you may load only one kernel module accessing the
+      Catweasel controller at the same time.
+
+NOTE: If you want to read both sides of a C1541 disk you need to modify
+      your 5.25" floppy drive, because of the missing index hole on the
+      flip side, look at http://home.t-online.de/home/indcomp/flipside.html
+      for more details.
+
+NOTE: There is a difference between 3.5 inch HD and DD disks, especially when
+      HD disks are written in a DD drive, below is an explanation shamelessly
+      stolen from Michael Krause's cwfloppy README:
+
+      "... The small hole in the upper left corner DOES make a difference.
+      Back when you've been buying lots of disks, it was NOT just some trick
+      of the floppy disk industry to make you buy expensive HD disks when
+      you thought you could get away with cheap DD disks :-)
+      
+      When you insert an HD disk into an HD floppy drive, the floppy drive
+      actually changes physical parameters, for example magnetization
+      thresholds and writing current strength. A floppy drive does not and
+      can not write an HD disk in HD format with the same physical
+      parameters as a DD disk in DD format!
+      
+      If you use HD disks with HD format and DD disks with DD format,
+      everything's fine. However, at some time in the nineties, the floppy
+      disk industry stopped selling DD disks. Because many Amiga users still
+      relied on the DD format (only the Amiga 4000 has an HD drive), they
+      simply took HD disks and used them in their DD drives.  Some users
+      covered the HD indicator hole with a piece of tape, some didn't.
+      Because their drives were only DD drives, the drive didn't care -- so
+      it really didn't make a difference either! Most HD disks seem to work
+      fine this way, even though they have been constructed for HD
+      formatting. In fact, I've never come across an HD disk that could NOT
+      be used in an Amiga DD drive. There have been people claiming
+      otherwise, though.
+      
+      However, if you insert an HD disk formatted in DD format into an HD
+      drive, you HAVE to take care to cover the HD indicator hole! If you do
+      not do this, the drive will think it is an HD formatted disk and
+      adjust its physical parameters accordingly, leading to READ and/or
+      WRITE ERRORS on a basically fine disk! Unfortunately, this can not be
+      worked around in software.
+      
+      So, if somebody gives you a disk with an HD hole and you can not mount
+      it as either Amiga HD or MS-DOS HD, it could be a perfectly fine DD
+      formatted disk -- only your drive is in the wrong mode to read it
+      without errors, because it detects the uncovered HD hole and thinks it
+      is in HD format. Cover the hole with some piece of tape, and
+      everything will be fine.
+      
+      If you don't believe me, try this:
+      
+      - Get an HD disk with open hole and try formatting it in, say, Amiga DD
+        mode using your Catweasel with a standard contemporary HD floppy drive.
+        It doesn't work.. the validation gives lots of errors.
+      
+      - Try the same with the HD hole covered. It should work, provided the
+        disk is not damaged and it is not one of the few HD disks that
+        really don't work in DD mode.
+      
+      - Now that the disk has been formatted correctly in DD mode, look
+        at the histogram, you can clearly distinguish the three different
+	MFM magnetization pulse time intervals.
+      
+      - Now remove the tape from the HD hole and look at the histogram
+        again. How can anybody expect to recover any data from this disk
+        now? :-) ..."
+
+
+  ============================
+  [2] SHORT BUILD INSTRUCTIONS
+  ============================
+
+
+To build cw a simple 'make' should be enough, remember that you need the
+header files from your running kernel in order to compile the driver module.
+cw was tested under different distributions with Linux kernel versions
+2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 (all directly taken from
+http://www.kernel.org/), it was also succesfully compiled on Knoppix 4.0.2.
+
+
+  ===================================
+  [3] SHORT INSTALLATION INSTRUCTIONS
+  ===================================
+
+
+NOTE: The file conf/cwtoolrc.default contains the configuration for all
+      currently supported disk formats, this file is also compiled into
+      cwtool (you may see the contents with cwtool -D). You may also place a
+      customized version of this file to /etc/cwtoolrc or $HOME/.cwtoolrc,
+      so cwtool will load it on every start up. But currently there is no
+      description how such a file has to look like, because the directive
+      names and syntax may change in future versions. For easy changes
+      such as a different number of sectors per track you should use
+      conf/cwtoolrc.default as a template. If you write disks you may find
+      the directives 'skew' and 'interleave' interesting to change the sector
+      order on writing, both expect a positive decimal number. You may
+      experiment with the following command (yes the line break is ok, but
+      you may also write it in one line):
+      # cwtool -W -v -v -e 'disk "test" { format "gcr_cbm" sectors 21
+            skew 0 interleave 0 track 0 { } }' test /dev/zero /dev/null
+      First change the number after 'skew' and then that after 'interleave'
+      to see the effect. You may also write the string after option -e to a
+      file and use the option -f to let cwtool read this file.
+
+NOTE: You need to be root to do the things described below.
+
+NOTE: If you use a device file system like devfs or udev you have to
+      determine yourself how to add the device nodes permanently.
+
+You may use cw without calling 'make install' if you do the following steps
+manually:
+
+1a) load the module
+    # insmod module/cw.o		(Linux 2.4)
+    # insmod module/cw.ko		(Linux 2.6)
+
+1b) make sure the module was loaded correctly
+    # lsmod
+    # dmesg | tail
+    The first command prints out a list of all loaded kernel modules, the
+    second prints out kernel messages, the last lines should contain
+    messages from cw.
+
+2)  create the device nodes (up to 4 controllers are supported, every
+    controller may have up to 2 floppy drives)
+    # mknod /dev/cw0raw0 c 120 31
+    # mknod /dev/cw0raw1 c 120 63
+    # mknod /dev/cw1raw0 c 120 95
+    # mknod /dev/cw1raw1 c 120 127
+    # mknod /dev/cw2raw0 c 120 159
+    # mknod /dev/cw2raw1 c 120 191
+    # mknod /dev/cw3raw0 c 120 223
+    # mknod /dev/cw3raw1 c 120 255
+
+3a) run cwtool to read a disk (in this case: read an Amiga 3.5 inch DD disk
+    from the first drive on the first controller and write it to image.adf)
+    # bin/cwtool -R -v amiga_dd /dev/cw0raw0 image.adf
+
+3b) Writing a disk is similar (in this case: write image.d64 to a C1541
+    5.25 inch disk in the second drive of the first controller)
+    # bin/cwtool -W -v c1541 image.d64 /dev/cw0raw1
+
+3c) Look at the man page of cwtool, to get an overview what other things
+    are possible
+    # man doc/cwtool.1
+
+If you use 'make install' to install cw then /etc/modules.conf (Linux 2.4)
+or /etc/modprobe.conf (Linux 2.6) will be modified to allow automatic module
+loading. Per default it uses char major number 120, if this major number is
+already in use (look at /proc/devices) you need to choose a different number,
+use the command 'make install MAJOR=xx', where xx is a free char major number
+on your system. The following parameters are also possible, if these
+parameters are not specified more or less useful default values are used.
+
+BIN_DIR      - directory in which cwtool is installed
+MAN_DIR      - the man page will be copied to $MAN_DIR/man1
+MODULE_DIR   - directory in which the kernel driver module is installed
+MODULE_NAME  - the name of the module (you need to choose a different name
+               than 'cw' if you also use the catweasel package)
+MODULES_CONF - full path of the modules.conf or modprobe.conf file
+
+NOTE: You may also use 'make uninstall' to uninstall cw, the parameters of
+      the last 'make install' call are saved and are used for uninstalling,
+      but after a 'make clean' these saved parameters will be lost.

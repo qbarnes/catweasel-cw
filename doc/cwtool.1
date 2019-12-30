@@ -1,0 +1,187 @@
+.ds Q" ""
+.de Vb
+.ft CW
+.nf
+.ne \\$1
+..
+.de Ve
+.ft R
+
+.fi
+..
+
+.TH cwtool 1 "cw 0.08"
+
+.SH NAME
+cwtool \- tool for reading and writing floppy disk images with a Catweasel controller
+
+.SH SYNOPSIS
+.B cwtool
+\-V
+
+.B cwtool
+\-D
+
+.B cwtool
+\-L
+[\-v]
+[\-n]
+[\-f \fI<file>\fR]
+[\-e \fI<config>\fR]
+
+.B cwtool
+\-S
+[\-v]
+[\-n]
+[\-f \fI<file>\fR]
+[\-e \fI<config>\fR]
+\fI<diskname>\fR
+\fI<srcfile>\fR
+
+.B cwtool
+\-R
+[\-v]
+[\-n]
+[\-f \fI<file>\fR]
+[\-e \fI<config>\fR]
+[\-r \fI<num>\fR]
+\fI<diskname>\fR
+\fI<srcfile>\fR
+\fI<dstfile>\fR
+
+.B cwtool
+\-W
+[\-v]
+[\-n]
+[\-f \fI<file>\fR]
+[\-e \fI<config>\fR]
+\fI<diskname>\fR
+\fI<srcfile>\fR
+\fI<dstfile>\fR
+
+.SH DESCRIPTION
+.PP
+\fBcwtool\fR is the user space companion program for the cw kernel driver module. cw is a package for the Catweasel controller especially for accessing the floppy drives connected to Catweasel. Some preliminary remarks:
+.RS
+.IP * 2
+\fBcwtool\fR uses one number for track numbering, this number contains the hardware track and side. The calculation is rather simple: 2 * hardware_track + side. With the options \-R \-v or \-W \-v you will see such numbers
+.IP * 2
+Options like \-D, \-n, \-f or \-e refer to a configuration. The configuration directives and syntax are currently undocumented, because they may change in future versions.
+.IP * 2
+If you want to use files named \- use ./\-, otherwise \fBcwtool\fR will use stdin or stdout (depending on the file being source or destination).
+.IP * 2
+\fBcwtool\fR reads or writes disk images it does not care if these images contain valid file systems or not.
+.IP * 2
+If you have problems reading 3.5 inch HD disks written in a DD drive, or if you are unable to read the flip side of a C1541 disk, please consult the README file coming with the source distribution of cw.
+.IP * 2
+Not all formats have been extensivly tested, if you have problems please contact the author (the email address is listed in the README of the source distribution).
+.RE
+
+.SH OPTIONS
+.IP "\-V, \-\-version" 8
+Print out version and exit.
+.IP "\-D, \-\-dump" 8
+Dump builtin config and exit.
+.IP "\-L, \-\-list" 8
+List available disk names and exit.
+.IP "\-S, \-\-statistics" 8
+Print out statistics of a disk, most notably the histogram.
+.IP "\-R, \-\-read" 8
+Read a disk and write the content to an image file.
+.IP "\-W, \-\-write" 8
+Write a disk with content read from an image file.
+.IP "\-h, \-\-help" 8
+Print out usage information.
+.IP "\-v, \-\-verbose" 8
+Increase verbosity level.
+.IP "\-n, \-\-no\-rcfiles" 8
+Do not read rcfiles (/etc/cwtoolrc and ~/.cwtoolrc) on startup.
+.IP "\-f \fI<file>\fR, \-\-config \fI<file>\fR" 8
+Read additional config from \fI<file>\fR.
+.IP "\-e \fI<config>\fR, \-\-evaluate \fI<config>\fR" 8
+Evaluate the given string \fI<config>\fR as configuration parameters.
+.IP "\-r \fI<num>\fR, \-\-retry \fI<num>\fR" 8
+Retry \fI<num>\fR times on read errors.
+
+.SH EXAMPLES
+.IP "1." 8
+.Vb
+\&\fBcwtool\fR \-L \-v
+.Ve
+Get a list of all available disk names with some additional information.
+
+.IP "2." 8
+.Vb
+\&\fBcwtool\fR \-S raw_14 /dev/cw0raw0
+.Ve
+Access first floppy drive on first controller and print out a histogram of a disk read with 14 MHz.
+
+.IP "3." 8
+.Vb
+\&\fBcwtool\fR \-R \-v msdos_hd /dev/cw0raw0 bootdisk.img
+.Ve
+Read an MSDOS HD disk and write the content to file bootdisk.img. Print out some status information while reading.
+
+.IP "4." 8
+.Vb
+\&\fBcwtool\fR \-W \-v c1541 image.d64 /dev/cw2raw1
+.Ve
+Write a C1541 disk with the content read from image.d64 to the second floppy drive of the third controller.
+
+.IP "5." 8
+.Vb
+\&\fBgzip\fR \-d \-c image.adf.gz |
+\&\fBcwtool\fR \-W \-v amiga_dd \- /dev/cw0raw0
+.Ve
+Uncompress image.adf.gz on the fly and write it to disk.
+
+.IP "6." 8
+.Vb
+\&\fBcwtool\fR \-W \-v amiga_dd image.adf /dev/cw0raw0 &&
+\&\fBcwtool\fR \-R amiga_dd /dev/cw0raw0 \- |
+\&\fBcmp\fR \- image.adf
+.Ve
+Write image.adf to disk, read it in and compare with the original data, if there is a difference \fBcmp\fR will exit with an error message.
+
+.IP "7." 8
+.Vb
+\&\fBcwtool\fR \-R \-v raw_14 /dev/cw0raw0 \- |
+\&\fBbzip2\fR \-c \- > image.cwraw.bz2
+.Ve
+Read a disk with 14 MHz and compress the data on the fly. The written data is in raw format, this means it contains just the values \fBcwtool\fR got from the kernel driver. This is useful for later analysis of the disk format, if the format is currently not supported by \fBcwtool\fR (DD disk should be read with raw_14 and HD disks with raw_28).
+
+.IP "8." 8
+.Vb
+\&\fBcwtool\fR \-S \-v \-f \- my_raw /dev/cw0raw0 <<EOC
+\&disk \*(Q"my_raw\*(Q"
+\&        {
+\&        format \*(Q"raw\*(Q"
+\&        image \*(Q"raw\*(Q"
+\&        clock 28
+\&        track 120 timeout 500
+\&        }
+\&EOC
+.Ve
+Read track 120 (hardware track 60, first side) of a disk with 28 MHz, print out a long histogram.
+
+.IP "9." 8
+.Vb
+\&\fBcwtool\fR \-W \-v msdos_hd /dev/zero /dev/cw0raw0
+.Ve
+Format an MSDOS HD disk with all sectors containing zero.
+
+.IP "10." 8
+.Vb
+\&\fBcwtool\fR \-W \-v amiga_dd /dev/urandom /dev/cw0raw0
+.Ve
+Format an Amiga DD disk with all sectors containing random data.
+
+.IP "11." 8
+.Vb
+\&\fBcwtool\fR \-R \-r 0 \-v \-v \-v \-v amiga_dd  \\
+\&        /dev/cw0raw0 /dev/null 2> log
+.Ve
+Write a more verbose report of what happened while reading an Amiga DD disk to log, do not retry on disk errors.
+
+.SH AUTHOR
+Karsten Scheibler
