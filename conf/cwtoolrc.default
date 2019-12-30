@@ -12,7 +12,7 @@ disk "pattern_14"
 	info "RAW, 14 MHz, 83 trks, 2 sides, CLEARS ALL TRACKS OF A DISK"
 	format "fill"
 	clock 14
-	timeout 500
+	timeout 420
 	indexed yes
 	write mode 1
 	track_range 0 165 1 optional yes
@@ -23,7 +23,7 @@ disk "pattern_28"
 	info "RAW, 28 MHz, 83 trks, 2 sides, CLEARS ALL TRACKS OF A DISK"
 	format "fill"
 	clock 28
-	timeout 500
+	timeout 420
 	indexed yes
 	write mode 1
 	track_range 0 165 1 optional yes
@@ -112,7 +112,11 @@ disk "c1541"
 		}
 	format "gcr_cbm"
 	track_step 2
-	read timeout 180
+	read
+		{
+		timeout 180
+		postcomp yes
+		}
 	write
 		{
 		timeout 300
@@ -224,7 +228,11 @@ disk "c1541_d64"
 	image "d64"
 	clock 14
 	track_step 2
-	read timeout 180
+	read
+		{
+		timeout 180
+		postcomp yes
+		}
 	write
 		{
 		timeout 300
@@ -340,6 +348,7 @@ disk "c1541_g64"
 		{
 		timeout 180
 		align_track yes
+		postcomp yes
 		}
 	write
 		{
@@ -415,7 +424,11 @@ disk "c1541_300"
 	format "gcr_cbm"
 	clock 14
 	track_step 2
-	read timeout 230
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	write
 		{
 		timeout 400
@@ -527,7 +540,11 @@ disk "c1541_d64_300"
 	image "d64"
 	clock 14
 	track_step 2
-	read timeout 230
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	write
 		{
 		timeout 400
@@ -667,6 +684,7 @@ disk "c1541_g64_300"
 		{
 		timeout 230
 		align_track yes
+		postcomp yes
 		}
 	write
 		{
@@ -742,7 +760,11 @@ disk "c1571"
 	format "gcr_cbm"
 	clock 14
 	track_step 2
-	read timeout 180
+	read
+		{
+		timeout 180
+		postcomp yes
+		}
 	write
 		{
 		timeout 300
@@ -805,7 +827,11 @@ disk "c1571_40"
 	format "gcr_cbm"
 	clock 14
 	track_step 2
-	read timeout 180
+	read
+		{
+		timeout 180
+		postcomp yes
+		}
 	write
 		{
 		timeout 300
@@ -862,7 +888,11 @@ disk "c1581_dd"
 	format "mfm_nec765"
 	clock 14
 	sectors 10
-	read timeout 230
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	flip_side yes
 	track_range 0 159 1 write
 		{
@@ -883,7 +913,11 @@ disk "amiga_dd_5.25"
 	format "mfm_amiga"
 	clock 14
 	sectors 11
-	read timeout 190
+	read
+		{
+		timeout 190
+		postcomp yes
+		}
 	bounds
 		{
 		0x0800 0x16c4 0x1c00
@@ -909,7 +943,11 @@ disk "amiga_dd"
 	format "mfm_amiga"
 	clock 14
 	sectors 11
-	read timeout 230
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 300
@@ -929,7 +967,11 @@ disk "amiga_hd"
 	format "mfm_amiga"
 	clock 28
 	sectors 22
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 300
@@ -950,7 +992,11 @@ disk "msdos_dd_5.25"
 	clock 14
 	track_step 2
 	sectors 9
-	read timeout 190
+	read
+		{
+		timeout 190
+		postcomp yes
+		}
 	bounds
 		{
 		0x0800 0x16c4 0x1c00
@@ -979,7 +1025,11 @@ disk "msdos_dd"
 	format "mfm_nec765"
 	clock 14
 	sectors 9
-	read timeout 230
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 500
@@ -1000,7 +1050,11 @@ disk "msdos_hd_5.25"
 	format "mfm_nec765"
 	clock 28
 	sectors 15
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 500
@@ -1021,7 +1075,11 @@ disk "msdos_hd"
 	format "mfm_nec765"
 	clock 28
 	sectors 18
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 500
@@ -1042,7 +1100,11 @@ disk "msdos_hd_1476"
 	format "mfm_nec765"
 	clock 28
 	sectors 18
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 163 1 write
 		{
 		timeout 500
@@ -1063,7 +1125,11 @@ disk "msdos_hd_1494"
 	format "mfm_nec765"
 	clock 28
 	sectors 18
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 165 1 write
 		{
 		timeout 500
@@ -1084,7 +1150,11 @@ disk "msdos_hd_1600"
 	format "mfm_nec765"
 	clock 28
 	sectors 20
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 500
@@ -1106,7 +1176,11 @@ disk "msdos_hd_1680"
 	format "mfm_nec765"
 	clock 28
 	sectors 21
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 500
@@ -1128,7 +1202,11 @@ disk "msdos_hd_1722"
 	format "mfm_nec765"
 	clock 28
 	sectors 21
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 163 1 write
 		{
 		timeout 500
@@ -1150,7 +1228,11 @@ disk "msdos_hd_1743"
 	format "mfm_nec765"
 	clock 28
 	sectors 21
-	read timeout 215
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 165 1 write
 		{
 		timeout 500
@@ -1177,7 +1259,11 @@ disk "msdos_hd_1760"
 		1024 1024 1024 1024 1024 1024
 		1024 1024 1024 1024 1024
 		}
-	read timeout 225
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	track_range 0 159 1 write
 		{
 		timeout 500
@@ -1198,7 +1284,11 @@ disk "msdos_hd_1802"
 	info "MSDOS, MFM, 3.5  inch, 82 trks, 2 sides, 11-19 sec/trk, 1802 K"
 	format "mfm_nec765"
 	clock 28
-	read timeout 225
+	read
+		{
+		timeout 230
+		postcomp yes
+		}
 	write
 		{
 		timeout 500
@@ -1240,7 +1330,11 @@ disk "mac_5.25"
 	format "gcr_apple"
 	clock 14
 	sectors 16
-	read timeout 190
+	read
+		{
+		timeout 190
+		postcomp yes
+		}
 	write
 		{
 		timeout 300
@@ -1289,9 +1383,9 @@ disk "mac_dd_800"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1300 0x1a00
-			0x1b00 0x2500 0x2d00
-			0x2e00 0x3700 0x7000
+			0x0800 0x1358 0x1a00
+			0x1b00 0x25b0 0x2d00
+			0x2e00 0x3808 0x7000
 			}
 		write precomp
 			{
@@ -1306,9 +1400,9 @@ disk "mac_dd_800"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1400 0x1c00
-			0x1d00 0x2700 0x2f00
-			0x3000 0x3a00 0x7000
+			0x0800 0x1500 0x1e00
+			0x1f00 0x2900 0x3200
+			0x3300 0x3d00 0x7000
 			}
 		write precomp
 			{
@@ -1323,9 +1417,9 @@ disk "mac_dd_800"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1700 0x2100
-			0x2200 0x2d00 0x3700
-			0x3800 0x4300 0x7000
+			0x0800 0x1710 0x2100
+			0x2200 0x2d20 0x3700
+			0x3800 0x4330 0x7000
 			}
 		sectors 10
 		}
@@ -1334,9 +1428,9 @@ disk "mac_dd_800"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1a00 0x2400
-			0x2500 0x3100 0x3c00
-			0x3d00 0x4900 0x7000
+			0x0800 0x19a0 0x2400
+			0x2500 0x3240 0x3d00
+			0x3e00 0x4ae0 0x7000
 			}
 		sectors 9
 		}
@@ -1345,9 +1439,9 @@ disk "mac_dd_800"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1c00 0x2800
-			0x2900 0x3700 0x4300
-			0x4400 0x5200 0x7000
+			0x0800 0x1cc0 0x2900
+			0x2a00 0x3880 0x4500
+			0x4600 0x5440 0x7000
 			}
 		sectors 8
 		}
@@ -1382,9 +1476,9 @@ disk "mac_dd_800_524"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1300 0x1a00
-			0x1b00 0x2500 0x2d00
-			0x2e00 0x3700 0x7000
+			0x0800 0x1358 0x1a00
+			0x1b00 0x25b0 0x2d00
+			0x2e00 0x3808 0x7000
 			}
 		write precomp
 			{
@@ -1399,9 +1493,9 @@ disk "mac_dd_800_524"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1400 0x1c00
-			0x1d00 0x2700 0x2f00
-			0x3000 0x3a00 0x7000
+			0x0800 0x1500 0x1e00
+			0x1f00 0x2900 0x3200
+			0x3300 0x3d00 0x7000
 			}
 		write precomp
 			{
@@ -1416,9 +1510,9 @@ disk "mac_dd_800_524"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1700 0x2100
-			0x2200 0x2d00 0x3700
-			0x3800 0x4300 0x7000
+			0x0800 0x1710 0x2100
+			0x2200 0x2d20 0x3700
+			0x3800 0x4330 0x7000
 			}
 		sectors 10
 		}
@@ -1427,9 +1521,9 @@ disk "mac_dd_800_524"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1a00 0x2400
-			0x2500 0x3100 0x3c00
-			0x3d00 0x4900 0x7000
+			0x0800 0x19a0 0x2400
+			0x2500 0x3240 0x3d00
+			0x3e00 0x4ae0 0x7000
 			}
 		sectors 9
 		}
@@ -1438,9 +1532,9 @@ disk "mac_dd_800_524"
 		interleave 1
 		bounds
 			{
-			0x0800 0x1c00 0x2800
-			0x2900 0x3700 0x4300
-			0x4400 0x5200 0x7000
+			0x0800 0x1cc0 0x2900
+			0x2a00 0x3880 0x4500
+			0x4600 0x5440 0x7000
 			}
 		sectors 8
 		}
@@ -1470,7 +1564,11 @@ disk "ibm_dsdd"
 	format "fm_nec765"
 	clock 28
 	sectors 26
-	read timeout 300
+	read
+		{
+		timeout 300
+		postcomp yes
+		}
 	track 0 { }
 	format "mfm_nec765"
 	clock  28
@@ -1482,7 +1580,11 @@ disk "ibm_dsdd"
 		256 256 256 256 256 256 256 256
 		256 256
 		}
-	read timeout 300
+	read
+		{
+		timeout 300
+		postcomp yes
+		}
 	track_range 1 4 1 write
 		{
 		timeout 500
@@ -1491,31 +1593,39 @@ disk "ibm_dsdd"
 	}
 
 disk "dec_rx01_sssd"
-         {
-         info "FM,  8 inch, 77 trks, 1 side, 26 sec/trk"
-         format "fm_nec765"
-         clock 28
-         sectors 26
-         read timeout 300
-         write
-                 {
-                 timeout 500
-                 epilog_length 1024
-                 }
-         track_range 0 152 2 { }
-         }
+	{
+	info "FM,  8 inch, 77 trks, 1 side, 26 sec/trk"
+	format "fm_nec765"
+	clock 28
+	sectors 26
+	read
+		{
+		timeout 300
+		postcomp yes
+		}
+	write
+		{
+		timeout 500
+		epilog_length 1024
+		}
+	track_range 0 152 2 { }
+	}
 
 disk "dg_dsdd"
-         {
-         info "MFM, 8 inch, 77 trks, 2 sides, 15 sec/trk"
-         format "mfm_nec765"
-         clock 28
-         sectors 15
-         read timeout 300
-         write
-                 {
-                 timeout 500
-                 epilog_length 1024
-                 }
-         track_range 0 4 1 { }
-         }
+	{
+	info "MFM, 8 inch, 77 trks, 2 sides, 15 sec/trk"
+	format "mfm_nec765"
+	clock 28
+	sectors 15
+	read
+		{
+		timeout 300
+		postcomp yes
+		}
+	write
+		{
+		timeout 500
+		epilog_length 1024
+		}
+	track_range 0 4 1 { }
+	}

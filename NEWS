@@ -1,3 +1,9 @@
+cw 0.12.1-20070319
+	* slightly changed configuration for mac_dd_800 and mac_dd_800_524
+	* enabled post compensation in all disk configurations. this should
+	  improve readability of disks but will also slow down disk reading
+	  especially on older computers with CPUs below 1 GHz
+
 cw 0.12-20070304
 	* support for Mac800K disks was added (thanks to Steve Ocepek,
 	  Oliver Stabel and Stefan A. Haubenthal for supplying raw images;

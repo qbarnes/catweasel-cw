@@ -44,15 +44,15 @@ http://www.fefe.de/dietlibc/ for more.
 
 
 NOTE: The file conf/cwtoolrc.default contains the configuration for all
-      currently supported disk formats, this file is also compiled into
+      currently supported disk formats. This file is also compiled into
       cwtool (you may see the contents with 'cwtool -D'). You may also place
       a customized version of this file to /etc/cwtoolrc or $HOME/.cwtoolrc,
       so cwtool will load it on every start up. But currently there is no
       description how such a file has to look like, because the syntax may
       change in future versions. For easy changes such as a different number
       of sectors per track you should use conf/cwtoolrc.default as a
-      template. But be prepared that you have to do your changes again with
-      new versions of cwtool.
+      template. But be prepared that you may have to do your changes again
+      with new versions of cwtool.
 
 NOTE: If you use devfs you have to determine yourself how to add the device
       nodes permanently, because devfs will be removed in future versions of

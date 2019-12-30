@@ -10,7 +10,7 @@
 .fi
 ..
 
-.TH cwtool 1 "cw 0.12"
+.TH cwtool 1 "cw 0.12.1"
 
 .SH NAME
 cwtool \- tool for reading and writing floppy disk images with a Catweasel controller
@@ -85,7 +85,7 @@ If you have problems reading 3.5 inch HD disks written in a DD drive, or if you 
 .IP * 2
 Not all formats have been extensively tested, if you have problems please contact the author (the email address is listed in the README of the source distribution).
 .IP * 2
-To allow reading and writing of G64 disk images \fBcwtool\fR has some built\-in magic. Before writing such images to disk unneeded data is stripped away, to shorten the track. Otherwise the track data may be too long and the last bytes of the track would overwrite the SYNC of the first sector. This does only work if the G64 image does contain valid CBM sector header ids, if not the data is written unchanged and may be too long. After reading a disk the same routines are used to strip away the track gap. It may be possible that too many data is discarded and the image is unusable (especially disks with copy protection mechanisms may use obscure sector layouts or other things). If you have such disks please send the author a raw image of it (look below how to create one). Additionally after reading the data after a SYNC is also byte aligned, because it seems VICE does not like unaligned data. To see what track stripping and aligning routines are doing use \-v \-v \-v \-v.
+To allow reading and writing of G64 disk images \fBcwtool\fR has some built\-in magic. Before writing such images to disk unneeded data is stripped away, to shorten the track. Otherwise the track data may be too long and the last bytes of the track would overwrite the SYNC of the first sector. This does only work if the G64 image does contain valid CBM sector header ids, if not the data is written unchanged and may be too long. After reading a disk the same routines are used to strip away the track gap. It may be possible that too many data is discarded and the image is unusable (especially disks with copy protection mechanisms may use obscure sector layouts or other things). If you have such disks please send the author a raw image of it (look below how to create one). Additionally after reading the data after a SYNC is also byte aligned, because it seems VICE does not like unaligned data. To see what the track stripping and aligning routines are doing use \-v \-v \-v \-v.
 .RE
 
 .SH OPTIONS

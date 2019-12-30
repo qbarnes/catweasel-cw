@@ -217,7 +217,7 @@ raw_postcomp_calculate(
 		error[i - 1] += d / 2;
 		error[i]     -= d;
 		error[i + 1] += d - (d / 2);
-		done[i] = 1;
+		done[i] = stage;
 		p++;
 		}
 	return (p);
@@ -552,8 +552,8 @@ raw_postcomp(
 	int				stage, area;
 
 	/*
-	 * increasing number of stages produces very nice histograms, but
-	 * worses the number of bad sectors on problematic disks
+	 * increasing number of stages produces sometimes very nice
+	 * histograms, but will not improve readability of a disk
 	 */
 
 	if (bnd_size < 2) return (0);
