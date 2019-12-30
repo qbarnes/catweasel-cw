@@ -168,25 +168,25 @@ mfm_nec765_read_sector(
 	data_size = mfm_nec765_sector_size(mfm_nec, sector);
 	result = format_compare2("sector size: got %d, expected %d", 1 << (header[4] + 7), data_size);
 	if (result > 0) verbose(2, "wrong sector size on sector %d", sector);
-	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_SECTOR_SIZE) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_SECTOR_SIZE) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_SIZE, result);
 
 	result = format_compare2("header crc16 checksum: got 0x%04x, expected 0x%04x", mfm_read_ushort_be(&header[5]), mfm_crc16(mfm_nec->rw.crc16_init_value, header, 5));
 	result += format_compare2("data crc16 checksum: got 0x%04x, expected 0x%04x", mfm_read_ushort_be(&data[data_size + 1]), mfm_crc16(mfm_nec->rw.crc16_init_value, data, data_size + 1));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
-	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_CHECKSUMS) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", header[1], track / 2);
 	result += format_compare2("side: got %d, expected %d", header[2], track % 2);
 	if (result > 0) verbose(2, "track or side mismatch on sector %d", sector);
-	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_TRACK_MISMATCH) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare3("data_address_mark: got 0x%02x, expected 0x%02x or 0x%02x", data[0], mfm_nec->rw.data_address_mark1, mfm_nec->rw.data_address_mark2);
 	if (result > 0) verbose(2, "wrong data_address_mark on sector %d", sector);
-	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_FORMAT_BYTE) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_nec->rd.flags & FLAG_RD_IGNORE_FORMAT_BYTE) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
 	/*
 	 * if the found sector is of better quality than the current one
@@ -292,6 +292,7 @@ mfm_nec765_write_track(
 	if (mfm_write_sync(&ffo_l1, 0x5224, 3) == -1) return (0);
 	if (mfm_write_fill(&ffo_l1, 0xfc, 1)   == -1) return (0);
 	for (i = 0; i < fmt->mfm_nec.rw.sectors; i++) if (mfm_nec765_write_sector(&ffo_l1, &fmt->mfm_nec, &dsk_sct[i], track) == -1) return (0);
+	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.fill_value6, fmt->mfm_nec.wr.fill_length6)   == -1) return (0);
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_nec.wr.fill_value7, fmt->mfm_nec.wr.fill_length7)   == -1) return (0);
 	if (mfm_write_sync(&ffo_l1, 0x4489, 3) == -1) return (0);

@@ -65,6 +65,12 @@ gcr_read_sync(
 		for (i -= 16, j = 16; j > 0; i++, j--, reg <<= 1)
 			{
 			if (reg & 0x8000) continue;
+
+			/*
+			 * the check above with 0xffff guarants that, this
+			 * check is executed at least once
+			 */
+
 			if (i >= size) goto found;
 			i = -1;
 			}
@@ -147,7 +153,7 @@ gcr_read_bytes(
 		if ((decode[n1] == 0xff) || (decode[n2] == 0xff))
 			{
 			verbose(3, "gcr decode error around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1) - 10, i);
-			dsk_err->errors++;
+			disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 			}
 		data[i] = (decode[n1] << 4) | decode[n2];
 		}
@@ -324,18 +330,18 @@ gcr_cbm_read_sector(
 	result = format_compare2("header xor checksum: got 0x%02x, expected 0x%02x", header[1], gcr_cbm_checksum(&header[2], 6));
 	result += format_compare2("data xor checksum: got 0x%02x, expected 0x%02x", data[257], gcr_cbm_checksum(&data[1], 256));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
-	if (gcr_cbm->rd.flags & FLAG_IGNORE_CHECKSUMS) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (gcr_cbm->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", header[3], track);
 	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
-	if (gcr_cbm->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (gcr_cbm->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("data_id: got 0x%02x, expected 0x%02x", data[0], gcr_cbm->rw.data_id);
 	if (result > 0) verbose(2, "wrong data_id on sector %d", sector);
-	if (gcr_cbm->rd.flags & FLAG_IGNORE_DATA_ID) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (gcr_cbm->rd.flags & FLAG_IGNORE_DATA_ID) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
 	/*
 	 * if the found sector is of better quality than the current one
@@ -440,6 +446,7 @@ gcr_cbm_write_track(
 
 	if (gcr_write_fill(&ffo_l1, fmt->gcr_cbm.wr.prolog_value, fmt->gcr_cbm.wr.prolog_length) == -1) return (0);
 	for (i = 0; i < fmt->gcr_cbm.rw.sectors; i++) if (gcr_cbm_write_sector(&ffo_l1, &fmt->gcr_cbm, &dsk_sct[i], track) == -1) return (0);
+	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (gcr_write_fill(&ffo_l1, fmt->gcr_cbm.wr.epilog_value, fmt->gcr_cbm.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1);
 	if (raw_write(&ffo_l1, ffo_l0, fmt->gcr_cbm.rw.bnd, fmt->gcr_cbm.wr.precomp, 3) == -1) return (0);

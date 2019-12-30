@@ -1,14 +1,31 @@
-cw-0.09-20060110
+cw 0.10-20060215
+	* added configuration amiga_dd_5.25 for Amiga 5.25" DD
+	* added configuration mac_hd for Mac 3.5" HD disks (same as msdos_hd)
+	* added support for G64 disk images, only images with one speed
+	  per track are supported, please read the man page for more
+	* added configuration c1541_g64, c1541_40_g64 and c1541_42_g64 for
+	  G64 disk images with 35, 40 and 42 tracks
+	* added configuration c1541_42 for 42 Track C1541 images
+	* changed configuration for c1541 and c1541_40, but this should
+	  be only an issue if you want to use raw image files from earlier
+	  versions of cwtool, this change was needed to equalize track
+	  numbering with G64 formats
+	* added more detailed error reporting if bad sectors where found
+	  with -R -v
+	* fixed endianess issue in the amiga checksum routine (thanks to
+	  Stefan A. Haubenthal for pointing that out)
+
+cw 0.09-20060110
 	* new option: -s
-	* changed configuration for c1541, c1541_40, c1571 and c1571_40,
+	* changed configuration for c1541, c1541_40, c1571 and c1571_40.
 	  disks written with version 0.08 may cause read errors in
 	  original C1541 and C1571 drives, because the heads are thicker
 	  and are also influenced by data between the tracks (one track
-	  on C1541/C1571 drives are two tracks in 5.25" HD drives), when
+	  on C1541/C1571 drives are two tracks in 5.25" HD drives). when
 	  writing such disks the tracks inbetween are now cleared,
 	  furthermore other timings are used
 	* corrected track numbering for c1571, but i do not own a C1571 so
 	  i could not test if it works now correctly
 
-cw-0.08-20051202
+cw 0.08-20051202
 	* first official release

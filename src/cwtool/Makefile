@@ -9,9 +9,10 @@ CONVERT=${SH} ../../tools/convert.sh
 
 CONFIG=../../conf/cwtoolrc.default
 OBJECTS=cwtool.o error.o debug.o verbose.o config.o format.o disk.o  \
-	string.o fifo.o file.o raw.o fill.o setvalue.o bounds.o  \
-	mfmfm.o mfm.o fm.o fm_nec765.o mfm_nec765.o mfm_amiga.o  \
-	gcr_apple.o gcr_cbm.o tbe_cw.o
+	string.o fifo.o file.o fill.o setvalue.o bounds.o import.o  \
+	export.o image.o image_raw.o image_g64.o image_plain.o  \
+	mfmfm.o mfm.o fm.o raw.o fm_nec765.o mfm_nec765.o  \
+	mfm_amiga.o gcr_apple.o gcr_cbm.o gcr_g64.o tbe_cw.o
 TARGET=../../bin/cwtool
 
 .PHONY: all clean

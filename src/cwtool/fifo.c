@@ -11,6 +11,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 
 #include "fifo.h"
 #include "error.h"
@@ -27,12 +28,7 @@ fifo_reset(
 	struct fifo			*ffo)
 
 	{
-	*ffo = (struct fifo)
-		{
-		.data  = ffo->data,
-		.size  = ffo->size,
-		.limit = ffo->limit
-		};
+	*ffo = (struct fifo) { .data = ffo->data, .size = ffo->size, .limit = ffo->limit };
 	return (1);
 	}
 
@@ -47,49 +43,6 @@ fifo_get_size(
 
 	{
 	return (ffo->size);
-	}
-
-
-
-/****************************************************************************
- * fifo_set_flags
- ****************************************************************************/
-int
-fifo_set_flags(
-	struct fifo			*ffo,
-	int				flags)
-
-	{
-	ffo->flags |= flags;
-	return (0);
-	}
-
-
-
-/****************************************************************************
- * fifo_clear_flags
- ****************************************************************************/
-int
-fifo_clear_flags(
-	struct fifo			*ffo,
-	int				flags)
-
-	{
-	ffo->flags &= ~flags;
-	return (0);
-	}
-
-
-
-/****************************************************************************
- * fifo_get_flags
- ****************************************************************************/
-int
-fifo_get_flags(
-	struct fifo			*ffo)
-
-	{
-	return (ffo->flags);
 	}
 
 
@@ -208,7 +161,7 @@ fifo_set_rd_bitofs(
 
 	{
 	debug_error_condition((rd_bitofs < 0) || (rd_bitofs > ffo->wr_bitofs));
-	ffo->rd_ofs    = (rd_bitofs + 7) >> 3;
+	ffo->rd_ofs    = (rd_bitofs + 7) / 8;
 	ffo->rd_bitofs = rd_bitofs;
 	if (ffo->rd_bitofs & 7) ffo->reg = ((int) ffo->data[ffo->rd_ofs - 1]) << (ffo->rd_bitofs & 7);
 	return (0);
@@ -310,19 +263,20 @@ fifo_write_bits(
 	int				bits)
 
 	{
-	int				avail = bits + (ffo->wr_bitofs & 7);
+	int				avail  = bits + (ffo->wr_bitofs & 7);
+	int				wr_ofs = ffo->wr_bitofs / 8;
 
 	debug_error_condition(bits > 16);
 	debug_error_condition((val < 0) || (val >= (1 << bits)));
-	if (ffo->wr_ofs == 0) ffo->wr_ofs++;
 	ffo->reg = (ffo->reg << bits) | val;
 	while (avail > 7)
 		{
-		if (ffo->wr_ofs >= ffo->limit) return (-1);
+		if (wr_ofs >= ffo->limit) return (-1);
 		avail -= 8;
-		ffo->data[ffo->wr_ofs++ - 1] = ffo->reg >> avail;
+		ffo->data[wr_ofs++] = ffo->reg >> avail;
 		}
 	ffo->wr_bitofs += bits;
+	ffo->wr_ofs = (ffo->wr_bitofs + 7) / 8;
 	return (0);
 	}
 
@@ -389,6 +343,111 @@ fifo_write_byte(
 
 
 /****************************************************************************
+ * fifo_read_block
+ ****************************************************************************/
+int
+fifo_read_block(
+	struct fifo			*ffo,
+	unsigned char			*data,
+	int				size)
+
+	{
+	int				result = 0;
+
+	if (ffo->rd_ofs >= ffo->wr_ofs) return (-1);
+	debug_error_condition(size < 0);
+	debug_error_condition(data == NULL);
+	debug_error_condition((ffo->rd_bitofs & 7) != 0);
+	if (ffo->rd_ofs + size > ffo->wr_ofs) result = -1, size = ffo->wr_ofs - ffo->rd_ofs;
+	memcpy(data, &ffo->data[ffo->rd_ofs], size);
+	ffo->rd_ofs += size;
+	ffo->rd_bitofs += 8 * size;
+	return (result);
+	}
+
+
+
+/****************************************************************************
+ * fifo_write_block
+ ****************************************************************************/
+int
+fifo_write_block(
+	struct fifo			*ffo,
+	unsigned char			*data,
+	int				size)
+
+	{
+	int				result = 0;
+
+	if (ffo->wr_ofs >= ffo->limit) return (-1);
+	debug_error_condition(size < 0);
+	debug_error_condition(data == NULL);
+	debug_error_condition((ffo->wr_bitofs & 7) != 0);
+	if (ffo->wr_ofs + size > ffo->limit) result = -1, size = ffo->limit - ffo->wr_ofs;
+	memcpy(&ffo->data[ffo->wr_ofs], data, size);
+	ffo->wr_ofs += size;
+	ffo->wr_bitofs += 8 * size;
+	return (result);
+	}
+
+
+
+/****************************************************************************
+ * fifo_copy_block
+ ****************************************************************************/
+int
+fifo_copy_block(
+	struct fifo			*ffo_src,
+	struct fifo			*ffo_dst,
+	int				size)
+
+	{
+	int				result = 0;
+
+	if (ffo_src->rd_ofs >= ffo_src->wr_ofs) return (-1);
+	if (ffo_dst->wr_ofs >= ffo_dst->limit) return (-1);
+	debug_error_condition(size < 0);
+	debug_error_condition((ffo_src->rd_bitofs & 7) != 0);
+	debug_error_condition((ffo_dst->wr_bitofs & 7) != 0);
+	if (ffo_src->rd_ofs + size > ffo_src->wr_ofs) result = -1, size = ffo_src->wr_ofs - ffo_src->rd_ofs;
+	if (ffo_dst->wr_ofs + size > ffo_dst->limit) result = -1, size = ffo_dst->limit - ffo_dst->wr_ofs;
+	memcpy(&ffo_dst->data[ffo_dst->wr_ofs], &ffo_src->data[ffo_src->rd_ofs], size);
+	ffo_src->rd_ofs += size;
+	ffo_src->rd_bitofs += 8 * size;
+	ffo_dst->wr_ofs += size;
+	ffo_dst->wr_bitofs += 8 * size;
+	return (result);
+	}
+
+
+
+/****************************************************************************
+ * fifo_copy_bitblock
+ ****************************************************************************/
+int
+fifo_copy_bitblock(
+	struct fifo			*ffo_src,
+	struct fifo			*ffo_dst,
+	int				bits)
+
+	{
+	int				b, val;
+
+	if ((bits & 7) + (ffo_src->rd_bitofs & 7) + (ffo_dst->wr_bitofs & 7) == 0) return (fifo_copy_block(ffo_src, ffo_dst, bits / 8));
+	while (bits > 0)
+		{
+		b = (bits < 16) ? bits : 16;
+		val = fifo_read_bits(ffo_src, b);
+		if (val == -1) return (-1);
+		if (fifo_write_bits(ffo_dst, val, b) == -1) return (-1);
+		bits -= b;
+		}
+	return (0);
+	}
+
+
+
+/****************************************************************************
  * fifo_write_flush
  ****************************************************************************/
 int
@@ -399,5 +458,77 @@ fifo_write_flush(
 	if (ffo->wr_bitofs & 7) ffo->data[ffo->wr_ofs - 1] = ffo->reg << (8 - (ffo->wr_bitofs & 7));
 	ffo->reg = 0;
 	return (0);
+	}
+
+
+
+/****************************************************************************
+ * fifo_set_flags
+ ****************************************************************************/
+int
+fifo_set_flags(
+	struct fifo			*ffo,
+	int				flags)
+
+	{
+	ffo->flags |= flags;
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * fifo_clear_flags
+ ****************************************************************************/
+int
+fifo_clear_flags(
+	struct fifo			*ffo,
+	int				flags)
+
+	{
+	ffo->flags &= ~flags;
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * fifo_get_flags
+ ****************************************************************************/
+int
+fifo_get_flags(
+	struct fifo			*ffo)
+
+	{
+	return (ffo->flags);
+	}
+
+
+
+/****************************************************************************
+ * fifo_set_speed
+ ****************************************************************************/
+int
+fifo_set_speed(
+	struct fifo			*ffo,
+	int				speed)
+
+	{
+	debug_error_condition((speed < 0) || (speed > 3));
+	ffo->speed = speed;
+	return (0);
+	}
+
+
+
+/****************************************************************************
+ * fifo_get_speed
+ ****************************************************************************/
+int
+fifo_get_speed(
+	struct fifo			*ffo)
+
+	{
+	return (ffo->speed);
 	}
 /******************************************************** Karsten Scheibler */

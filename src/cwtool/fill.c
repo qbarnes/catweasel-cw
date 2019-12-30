@@ -11,6 +11,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 
 #include "error.h"
 #include "debug.h"
@@ -83,10 +84,9 @@ fill_write_track(
 	unsigned char			*data = fifo_get_data(ffo_l0);
 	unsigned char			val = fmt->fll.wr.fill_value;
 	int				len = fmt->fll.wr.fill_length;
-	int				i;
 
 	debug_error_condition(len > fifo_get_limit(ffo_l0));
-	for (i = 0; i < len; i++) data[i] = val;
+	memset(data, val, len);
 	fifo_set_wr_ofs(ffo_l0, len);
 	fifo_set_flags(ffo_l0, FIFO_FLAG_WRITABLE);
 	return (1);
@@ -234,7 +234,7 @@ static struct format_option		fill_dummy_options[] =
 struct format_desc			fill_format_desc =
 	{
 	.name             = "fill",
-	.level            = 3,
+	.level            = -1,
 	.set_defaults     = fill_set_defaults,
 	.set_read_option  = fill_set_dummy_option,
 	.set_write_option = fill_set_write_option,

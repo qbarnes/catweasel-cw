@@ -131,7 +131,7 @@ raw_div(
 
 /****************************************************************************
  *
- * functions for sector and track handling
+ * functions for track handling
  *
  ****************************************************************************/
 
@@ -147,15 +147,10 @@ raw_read_write_track(
 	struct fifo			*ffo_dst)
 
 	{
-	unsigned char			*data_src = fifo_get_data(ffo_src);
-	unsigned char			*data_dst = fifo_get_data(ffo_dst);
-	int				i, wr_ofs = fifo_get_wr_ofs(ffo_src);
+	int				size = fifo_get_wr_ofs(ffo_src);
 
-	fifo_set_limit(ffo_dst, fifo_get_size(ffo_dst));
-	debug_error_condition(fifo_get_limit(ffo_dst) < wr_ofs);
-	for (i = 0; i < wr_ofs; i++) data_dst[i] = data_src[i];
-	fifo_set_rd_ofs(ffo_src, wr_ofs);
-	fifo_set_wr_ofs(ffo_dst, wr_ofs);
+	debug_error_condition(fifo_get_limit(ffo_dst) < size);
+	if (fifo_copy_block(ffo_src, ffo_dst, size) == -1) return (0);
 	fifo_set_flags(ffo_dst, fifo_get_flags(ffo_src));
 	return (1);
 	}
@@ -381,7 +376,8 @@ raw_write_counter(
 
 	if ((i < 0) || (i >= raw_cnt->bnd_size))
 		{
-		error_warning("could not convert invalid bit pattern at offset %d", fifo_get_wr_ofs(ffo_l0));
+		verbose(3, "could not convert invalid bit pattern at offset %d", fifo_get_wr_ofs(ffo_l0));
+		raw_cnt->invalid++;
 		i = raw_cnt->bnd_size - 1;
 		}
 	raw_cnt->this += raw_cnt->bnd[i].write;
@@ -473,6 +469,7 @@ raw_write(
 		if (i >= 128) i = 127;
 		if (raw_write_counter(ffo_l0, &raw_cnt, lookup[i]) == -1) return (-1);
 		}
+	if (raw_cnt.invalid > 0) error_warning("could not convert %d invalid bit patterns", raw_cnt.invalid);
 	debug(3, "raw_write ffo_l1->rd_bitofs = %d, ffo_l0->wr_ofs = %d", fifo_get_rd_bitofs(ffo_l1), fifo_get_wr_ofs(ffo_l0));
 
 	return (0);

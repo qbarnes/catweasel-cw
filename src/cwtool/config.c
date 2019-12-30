@@ -17,8 +17,8 @@
 #include "debug.h"
 #include "verbose.h"
 #include "disk.h"
-#include "file.h"
 #include "format.h"
+#include "image.h"
 #include "string.h"
 
 
@@ -460,7 +460,7 @@ config_disk(
 	config_name(cfg, "disk name expected", token, sizeof (token));
 	if (! disk_set_name(dsk, token)) config_error(cfg, "already defined disk '%s' within this scope", token);
 	config_directive(cfg, dsk, dsk_trk, NULL, CONFIG_ENTER | CONFIG_TRACK | CONFIG_RW);
-	if (! disk_init_size(dsk)) config_error(cfg, "no tracks used");
+	if (! disk_tracks_used(dsk)) config_error(cfg, "no tracks used");
 	if (! disk_image_ok(dsk)) config_error(cfg, "specified format and image are not on the same level");
 	return (1);
 	}
@@ -533,11 +533,11 @@ config_image(
 
 	{
 	char				token[CWTOOL_MAX_NAME_LEN];
-	struct file_image		*fil_img;
+	struct image_desc		*img_dsc;
 
-	fil_img = file_search_image(config_name(cfg, "image name expected", token, sizeof (token)));
-	if (fil_img == NULL) config_error(cfg, "unknown image name '%s'", token);
-	return (disk_set_image(dsk, fil_img));
+	img_dsc = image_search_desc(config_name(cfg, "image name expected", token, sizeof (token)));
+	if (img_dsc == NULL) config_error(cfg, "unknown image name '%s'", token);
+	return (disk_set_image(dsk, img_dsc));
 	}
 
 
@@ -1005,8 +1005,9 @@ config_parse(
 	verbose(1, "reading config from '%s'", file);
 	while (1)
 		{
-		struct disk		dsk = DISK_INIT(version, &file_image_raw, &file_image_plain);
+		struct disk		dsk;
 
+		disk_init(&dsk, version);
 		debug(1, "looking for next disk, version = %d", version);
 		if (! config_directive(&cfg, &dsk, NULL, NULL, CONFIG_DISK)) break;
 		disk_insert(&dsk);

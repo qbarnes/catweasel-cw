@@ -168,21 +168,21 @@ fm_nec765_read_sector(
 	data_size = 1 << (header[3] + 7);
 	result = format_compare2("sector size: got %d, expected %d", data_size, fm_nec765_sector_size(fm_nec, sector));
 	if (result > 0) verbose(2, "wrong sector size on sector %d", sector);
-	if (fm_nec->rd.flags & FLAG_RD_IGNORE_SECTOR_SIZE) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (fm_nec->rd.flags & FLAG_RD_IGNORE_SECTOR_SIZE) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_SIZE, result);
 	data_size = fm_nec765_sector_size(fm_nec, sector);
 
 	result = format_compare2("header crc16 checksum: got 0x%04x, expected 0x%04x", fm_read_ushort_be(&header[4]), fm_crc16(fm_nec->rw.crc16_init_value1, header, 4));
 	result += format_compare2("data crc16 checksum: got 0x%04x, expected 0x%04x", fm_read_ushort_be(&data[data_size]), fm_crc16(init, data, data_size));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
-	if (fm_nec->rd.flags & FLAG_RD_IGNORE_CHECKSUMS) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (fm_nec->rd.flags & FLAG_RD_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", header[0], track / 2);
 	result += format_compare2("side: got %d, expected %d", header[1], track % 2);
 	if (result > 0) verbose(2, "track or side mismatch on sector %d", sector);
-	if (fm_nec->rd.flags & FLAG_RD_IGNORE_TRACK_MISMATCH) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (fm_nec->rd.flags & FLAG_RD_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	/*
 	 * if the found sector is of better quality than the current one
@@ -285,6 +285,7 @@ fm_nec765_write_track(
 	if (fm_write_fill(&ffo_l1, fmt->fm_nec.wr.fill_value1, fmt->fm_nec.wr.fill_length1)   == -1) return (0);
 	if (fm_write_sync(&ffo_l1, 0xf77a, 1) == -1) return (0);
 	for (i = 0; i < fmt->fm_nec.rw.sectors; i++) if (fm_nec765_write_sector(&ffo_l1, &fmt->fm_nec, &dsk_sct[i], track) == -1) return (0);
+	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (fm_write_fill(&ffo_l1, fmt->fm_nec.wr.fill_value6, fmt->fm_nec.wr.fill_length6)   == -1) return (0);
 	if (fm_write_fill(&ffo_l1, fmt->fm_nec.wr.fill_value7, fmt->fm_nec.wr.fill_length7)   == -1) return (0);
 	if (fm_write_fill(&ffo_l1, fmt->fm_nec.wr.epilog_value, fmt->fm_nec.wr.epilog_length) == -1) return (0);

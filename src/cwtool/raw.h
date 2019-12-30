@@ -22,6 +22,7 @@ struct raw_counter
 	int				last;
 	int				this;
 	int				last_i;
+	int				invalid;
 	struct bounds			*bnd;
 	short				*precomp;
 	int				bnd_size;

@@ -14,14 +14,14 @@
 #define CWTOOL_DISK_H
 
 #include "cwtool.h"
-#include "file.h"
+#include "image.h"
 #include "format.h"
 
-#define DISK_TRACK_INIT			(struct disk_track) { .fil_trk = FILE_TRACK_INIT(500) }
+#define DISK_TRACK_INIT			(struct disk_track) { .img_trk = IMAGE_TRACK_INIT(500) }
 
 struct disk_track
 	{
-	struct file_track		fil_trk;
+	struct image_track		img_trk;
 	struct format_desc		*fmt_dsc;
 	unsigned char			skew;
 	unsigned char			interleave;
@@ -29,7 +29,7 @@ struct disk_track
 	union format			fmt;
 	};
 
-#define DISK_INIT(v, r, i)		(struct disk) { .version = v, .fil_img_l0 = r, .fil_img = i }
+#define DISK_INIT(v)			(struct disk) { .version = v }
 
 struct disk
 	{
@@ -37,14 +37,22 @@ struct disk
 	char				info[CWTOOL_MAX_NAME_LEN];
 	int				size;
 	int				version;
-	struct file_image		*fil_img_l0;
-	struct file_image		*fil_img;
+	struct image_desc		*img_dsc_l0;
+	struct image_desc		*img_dsc;
 	struct disk_track		trk[CWTOOL_MAX_TRACK];
 	struct disk_track		trk_def;
 	};
 
+#define DISK_ERROR_FLAG_NOT_FOUND	(1 << 0)
+#define DISK_ERROR_FLAG_ENCODING	(1 << 1)
+#define DISK_ERROR_FLAG_ID		(1 << 2)
+#define DISK_ERROR_FLAG_NUMBERING	(1 << 3)
+#define DISK_ERROR_FLAG_SIZE		(1 << 4)
+#define DISK_ERROR_FLAG_CHECKSUM	(1 << 5)
+
 struct disk_error
 	{
+	int				flags;
 	int				errors;
 	int				warnings;
 	};
@@ -53,6 +61,7 @@ struct disk_sector
 	{
 	int				number;
 	unsigned char			*data;
+	int				offset;
 	int				size;
 	struct disk_error		err;
 	};
@@ -65,6 +74,12 @@ struct disk_summary
 	int				sectors_bad;
 	};
 
+struct disk_sector_info
+	{
+	int				flags;
+	int				offset;
+	};
+
 struct disk_info
 	{
 	int				track;
@@ -73,6 +88,7 @@ struct disk_info
 	int				sectors_weak;
 	int				sectors_bad;
 	struct disk_summary		sum;
+	struct disk_sector_info		sct_nfo[CWTOOL_MAX_TRACK][CWTOOL_MAX_SECTOR];
 	};
 
 #define DISK_OPTION_INIT(i, r, f)	(struct disk_option) { .info_func = i, .retry = r, .flags = f }
@@ -89,13 +105,14 @@ struct disk_option
 extern struct disk			*disk_get(int);
 extern struct disk			*disk_search(const char *);
 extern struct disk_track		*disk_init_track_default(struct disk *);
+extern int				disk_init(struct disk *, int);
 extern int				disk_insert(struct disk *);
 extern int				disk_copy(struct disk *, struct disk *);
-extern int				disk_init_size(struct disk *);
+extern int				disk_tracks_used(struct disk *);
 extern int				disk_image_ok(struct disk *);
 extern int				disk_check_track(int);
 extern int				disk_check_sectors(int);
-extern int				disk_set_image(struct disk *, struct file_image *);
+extern int				disk_set_image(struct disk *, struct image_desc *);
 extern int				disk_set_name(struct disk *, const char *);
 extern int				disk_set_info(struct disk *, const char *);
 extern int				disk_set_track(struct disk *, struct disk_track *, int);
@@ -122,6 +139,8 @@ extern struct format_desc		*disk_get_format(struct disk_track *);
 extern struct format_option		*disk_get_read_options(struct disk_track *);
 extern struct format_option		*disk_get_write_options(struct disk_track *);
 extern struct format_option		*disk_get_rw_options(struct disk_track *);
+extern int				disk_error_add(struct disk_error *, int, int);
+extern int				disk_warning_add(struct disk_error *, int);
 extern int				disk_sector_read(struct disk_sector *, struct disk_error *, unsigned char *);
 extern int				disk_sector_write(unsigned char *, struct disk_sector *);
 extern int				disk_statistics(struct disk *, const char *);

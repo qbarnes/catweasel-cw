@@ -19,11 +19,15 @@ about the controller features.
 RFDI: (request for disk images) To support more formats i need raw disk
       images. I am especially interested in C1571, C1581 and Apple-Images,
       if you have such disks, please use to following command:
-      # cwtool -R -v raw_14 /dev/cw0raw0 - | bzip2 -c - > image.cwraw.bz2
-      to create a raw disk image (/dev/cw0raw0 is the first drive on the
-      first controller, you need to change that if you use another drive).
 
-NOTE: There are 3 other Linux drivers for the Catweasel controller:
+      # cwtool -R -v raw_14 /dev/cw0raw0 - | bzip2 -c - > image.cwraw.bz2
+
+      to create a raw disk image. DD disks should be read with raw_14 and
+      HD disks with raw_28. The device file /dev/cw0raw0 accesses the first
+      drive on the first controller, you need to change that if you need to
+      use another drive.
+
+NOTE: There are at least 3 other Linux drivers for the Catweasel controller:
 
       catweasel(*) - http://llg.cubic.org/cw/, written by Dirk Jagdmann. A
       Linux driver for SID, Joysticks and Amiga keyboard. If you also want
@@ -57,11 +61,11 @@ NOTE: If you want to read both sides of a C1541 disk you need to modify
       flip side, look at http://home.t-online.de/home/indcomp/flipside.html
       for more details.
 
-NOTE: There is a difference between 3.5 inch HD and DD disks, especially when
+NOTE: There is a difference between 3.5" HD and DD disks, especially when
       HD disks are written in a DD drive, below is an explanation shamelessly
       stolen from Michael Krause's cwfloppy README:
 
-      "... The small hole in the upper left corner DOES make a difference.
+      >>>> The small hole in the upper left corner DOES make a difference.
       Back when you've been buying lots of disks, it was NOT just some trick
       of the floppy disk industry to make you buy expensive HD disks when
       you thought you could get away with cheap DD disks :-)
@@ -115,7 +119,7 @@ NOTE: There is a difference between 3.5 inch HD and DD disks, especially when
       
       - Now remove the tape from the HD hole and look at the histogram
         again. How can anybody expect to recover any data from this disk
-        now? :-) ..."
+        now? :-) <<<<
 
 
   ============================
@@ -125,9 +129,11 @@ NOTE: There is a difference between 3.5 inch HD and DD disks, especially when
 
 To build cw a simple 'make' should be enough, remember that you need the
 header files from your running kernel in order to compile the driver module.
-cw was tested under different distributions with Linux kernel versions
+cw was tested on x86 under different distributions with Linux kernel versions
 2.4.26, 2.4.32, 2.6.11.2 and 2.6.14.2 (all directly taken from
 http://www.kernel.org/), it was also succesfully compiled on Knoppix 4.0.2.
+There were also reports, that cw successfully runs on PowerPC platforms
+under Linux.
 
 You may build cwtool with dietlibc, just set and export the environment
 variable DIET to the location of your 'diet' binary and run 'make'. Dietlibc
@@ -142,19 +148,21 @@ http://www.fefe.de/dietlibc/ for more.
 
 NOTE: The file conf/cwtoolrc.default contains the configuration for all
       currently supported disk formats, this file is also compiled into
-      cwtool (you may see the contents with cwtool -D). You may also place a
-      customized version of this file to /etc/cwtoolrc or $HOME/.cwtoolrc,
+      cwtool (you may see the contents with 'cwtool -D'). You may also place
+      a customized version of this file to /etc/cwtoolrc or $HOME/.cwtoolrc,
       so cwtool will load it on every start up. But currently there is no
-      description how such a file has to look like, because the directive
-      names and syntax may change in future versions. For easy changes
-      such as a different number of sectors per track you should use
-      conf/cwtoolrc.default as a template. If you write disks you may find
-      the directives 'skew' and 'interleave' interesting to change the sector
-      order on writing, both expect a positive decimal number. You may
-      experiment with the following command (yes the line break is ok, but
-      you may also write it in one line):
+      description how such a file has to look like, because the syntax may
+      change in future versions. For easy changes such as a different number
+      of sectors per track you should use conf/cwtoolrc.default as a
+      template. If you write disks you may find the directives 'skew' and
+      'interleave' interesting to change the sector order on writing, both
+      expect a positive decimal number. You may experiment with the
+      following command (yes the line break is ok, but you may also write it
+      in one line):
+
       # cwtool -W -v -v -e 'disk "test" { format "gcr_cbm" sectors 21
             skew 0 interleave 0 track 0 { } }' test /dev/zero /dev/null
+
       First change the number after 'skew' and then after 'interleave'
       to see the effect. You may also write the string after option -e to a
       file and use the option -f to let cwtool read this file.
@@ -189,12 +197,12 @@ manually:
     # mknod /dev/cw3raw0 c 120 223
     # mknod /dev/cw3raw1 c 120 255
 
-3a) run cwtool to read a disk (in this case: read an Amiga 3.5 inch DD disk
+3a) run cwtool to read a disk (in this case: read an Amiga 3.5" DD disk
     from the first drive on the first controller and write it to image.adf)
     # bin/cwtool -R -v amiga_dd /dev/cw0raw0 image.adf
 
 3b) Writing a disk is similar (in this case: write image.d64 to a C1541
-    5.25 inch disk in the second drive of the first controller)
+    5.25" disk in the second drive of the first controller)
     # bin/cwtool -W -v c1541 image.d64 /dev/cw0raw1
 
 3c) Look at the man page of cwtool, to get an overview what other things
@@ -217,9 +225,9 @@ MODULE_NAME  - the name of the module (you need to choose a different name
 MODULES_CONF - full path of the modules.conf or modprobe.conf file
 
 NOTE: You may use 'make upgrade' if you want to upgrade from an older
-      version of cw, but you need to specify parameters differing from the
-      default values. Upgrading just means overwriting cwtool, the kernel
-      module and the man page with the current versions.
+      version of cw, but you need to specify those parameters that differ
+      from the default value. Upgrading just means overwriting cwtool, the
+      kernel module and the man page with the current versions.
 
 NOTE: You may use 'make uninstall' to uninstall cw, the parameters of
       the last 'make install' call are saved and are used for uninstalling,

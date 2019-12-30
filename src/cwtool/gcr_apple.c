@@ -121,7 +121,7 @@ gcr_read_8header_bits(
 	if ((val & 0xaaaa) != 0xaaaa)
 		{
 		verbose(3, "wrong header clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
-		dsk_err->errors++;
+		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 		}
 	return (val & (val >> 7) & 0xff);
 	}
@@ -227,7 +227,7 @@ gcr_read_data_bytes(
 		if (j == 0xff)
 			{
 			verbose(3, "data decode error around bit offset %d (byte %d), got 0x%02x(0x%02x)", fifo_get_rd_bitofs(ffo_l1) - 8, i, r, j);
-			dsk_err->errors++;
+			disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 			}
 		data[i] = j;
 		}
@@ -412,7 +412,7 @@ gcr_apple_read_sector2(
 	bitofs = fifo_get_rd_bitofs(ffo_l1);
 	if (gcr_read_header_bytes(ffo_l1, dsk_err, header, HEADER_SIZE) == -1) return (-1);
 	epilog = fifo_read_bits(ffo_l1, 16);
-	dsk_err->errors += format_compare2("header epilogue: got 0x%04x, expected 0x%04x", epilog, 0xdeaa);
+	disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, format_compare2("header epilogue: got 0x%04x, expected 0x%04x", epilog, 0xdeaa));
 	if (gcr_read_sync(ffo_l1, gcr_apl->rw.sync_value2) == -1) return (-1);
 
 	/* seems there is always one zero bit between sync and data */
@@ -420,7 +420,7 @@ gcr_apple_read_sector2(
 	if (fifo_read_bits(ffo_l1, 1) == -1) return (-1);
 	if (gcr_read_data_bytes(ffo_l1, dsk_err, data, DATA_SIZE) == -1) return (-1);
 	epilog = fifo_read_bits(ffo_l1, 16);
-	dsk_err->errors += format_compare2("data epilogue: got 0x%04x, expected 0x%04x", epilog, 0xdeaa);
+	disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, format_compare2("data epilogue: got 0x%04x, expected 0x%04x", epilog, 0xdeaa));
 	verbose(2, "rewinding to bit offset %d", bitofs);
 	fifo_set_rd_bitofs(ffo_l1, bitofs);
 	return (1);
@@ -492,18 +492,18 @@ gcr_apple_read_sector(
 	result = format_compare2("header xor checksum: got 0x%02x, expected 0x%02x", header[3], gcr_apple_header_checksum(header, 3));
 	result += format_compare2("data xor checksum: got 0x%02x, expected 0x%02x", data[342], gcr_apple_read_data_checksum(data, 342));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
-	if (gcr_apl->rd.flags & FLAG_IGNORE_CHECKSUMS) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (gcr_apl->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", header[1], track);
 	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
-	if (gcr_apl->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (gcr_apl->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("volume_id: got 0x%02x, expected 0x%02x", header[0], gcr_apl->rw.volume_id);
 	if (result > 0) verbose(2, "wrong volume_id on sector %d", sector);
-	if (gcr_apl->rd.flags & FLAG_IGNORE_VOLUME_ID) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (gcr_apl->rd.flags & FLAG_IGNORE_VOLUME_ID) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
 	/* unshuffle sector */
 
@@ -606,6 +606,7 @@ gcr_apple_write_track(
 
 	if (gcr_write_fill(&ffo_l1, 0x3fc, fmt->gcr_apl.wr.prolog_length) == -1) return (0);
 	for (i = 0; i < fmt->gcr_apl.rw.sectors; i++) if (gcr_apple_write_sector(&ffo_l1, &fmt->gcr_apl, &dsk_sct[i], track) == -1) return (0);
+	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (gcr_write_fill(&ffo_l1, 0x3fc, fmt->gcr_apl.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1);
 	if (raw_write(&ffo_l1, ffo_l0, fmt->gcr_apl.rw.bnd, fmt->gcr_apl.wr.precomp, 3) == -1) return (0);

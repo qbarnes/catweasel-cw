@@ -152,11 +152,6 @@ modify_modules_conf()
 #############################################################################
 cleanup_modules_conf()
 	{
-
-	# Linux 2.4 lists the module with its file name, while Linux 2.6
-	# lists it with its internal name, to handle both cases rmmod
-	# is called with both names
-
 	if [ ! -e "$MODULES_CONF" ]; then
 		echo "file '$MODULES_CONF' not found"
 		return
@@ -175,6 +170,11 @@ cleanup_modules_conf()
 #############################################################################
 unload_module()
 	{
+
+	# Linux 2.4 lists the module with its file name, while Linux 2.6
+	# lists it with its internal name, to handle both cases rmmod
+	# is called with both names
+
 	echo "removing kernel module (if loaded)" &&
 	rmmod cw "$MODULE_NAME" 2>/dev/null
 	echo "executing depmod" &&

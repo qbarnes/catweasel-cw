@@ -1,7 +1,7 @@
 /****************************************************************************
  ****************************************************************************
  *
- * version.h
+ * image_g64.h
  *
  ****************************************************************************
  ****************************************************************************/
@@ -10,13 +10,20 @@
 
 
 
-#ifndef CW_VERSION_H
-#define CW_VERSION_H
+#ifndef CWTOOL_IMAGE_G64_H
+#define CWTOOL_IMAGE_G64_H
 
-#define VERSION				"0.10"
-#define VERSION_DATE			"20060215"
+#define IMAGE_G64_MAX_TRACKS		84
+
+struct image_g64_track
+	{
+	unsigned char			*data;
+	int				size;
+	int				speed;
+	int				used;
+	};
 
 
 
-#endif /* !CW_VERSION_H */
+#endif /* !CWTOOL_IMAGE_G64_H */
 /******************************************************** Karsten Scheibler */

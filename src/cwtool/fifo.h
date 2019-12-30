@@ -31,15 +31,11 @@ struct fifo
 	int				rd_bitofs;
 	int				reg;
 	int				flags;
+	int				speed;
 	};
-
-#define fifo_write_count(ffo, count)	fifo_write_bits(ffo, 1, count + 1)
 
 extern int				fifo_reset(struct fifo *);
 extern int				fifo_get_size(struct fifo *);
-extern int				fifo_set_flags(struct fifo *, int);
-extern int				fifo_clear_flags(struct fifo *, int);
-extern int				fifo_get_flags(struct fifo *);
 extern int				fifo_set_limit(struct fifo *, int);
 extern int				fifo_get_limit(struct fifo *);
 extern unsigned char			*fifo_get_data(struct fifo *);
@@ -57,7 +53,18 @@ extern int				fifo_write_bits(struct fifo *, int, int);
 extern int				fifo_read_count(struct fifo *);
 extern int				fifo_read_byte(struct fifo *);
 extern int				fifo_write_byte(struct fifo *, int);
+extern int				fifo_read_block(struct fifo *, unsigned char *, int);
+extern int				fifo_write_block(struct fifo *, unsigned char *, int);
+extern int				fifo_copy_block(struct fifo *, struct fifo *, int);
+extern int				fifo_copy_bitblock(struct fifo *, struct fifo *, int);
 extern int				fifo_write_flush(struct fifo *);
+extern int				fifo_set_flags(struct fifo *, int);
+extern int				fifo_clear_flags(struct fifo *, int);
+extern int				fifo_get_flags(struct fifo *);
+extern int				fifo_set_speed(struct fifo *, int);
+extern int				fifo_get_speed(struct fifo *);
+
+#define fifo_write_count(ffo, count)	fifo_write_bits(ffo, 1, count + 1)
 
 
 

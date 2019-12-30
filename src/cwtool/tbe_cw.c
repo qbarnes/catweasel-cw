@@ -149,7 +149,7 @@ tbe_read_2bits(
 	if ((token < 0) || (token > 3))
 		{
 		verbose(3, "wrong counter value at offset %d (byte %d)", fifo_get_rd_ofs(ffo_l0) - 1, ofs);
-		dsk_err->errors++;
+		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 		token = 0;
 		}
 	return ((val << 2) | token);
@@ -432,23 +432,23 @@ tbe_cw_read_sector(
 	size = tbe_cw_sector_size(tbe_cw, sector);
 	result = format_compare2("sector size: got %d, expected %d", tbe_read_ushort_be(&data[6]), size);
 	if (result > 0) verbose(2, "wrong sector size on sector %d", sector);
-	if (tbe_cw->rd.flags & FLAG_IGNORE_SECTOR_SIZE) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (tbe_cw->rd.flags & FLAG_IGNORE_SECTOR_SIZE) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_SIZE, result);
 
 	result = format_compare2("crc16 checksum: got 0x%04x, expected 0x%04x", tbe_read_ushort_be(data), tbe_crc16(tbe_cw->rw.crc16_init_value, &data[2], HEADER_SIZE - 2 + size));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
-	if (tbe_cw->rd.flags & FLAG_IGNORE_CHECKSUMS) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (tbe_cw->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", data[4], track);
 	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
-	if (tbe_cw->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (tbe_cw->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("format_id: got %d, expected %d", data[2], tbe_cw->rw.format_id);
 	if (result > 0) verbose(2, "wrong format_id on sector %d", sector);
-	if (tbe_cw->rd.flags & FLAG_IGNORE_FORMAT_ID) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (tbe_cw->rd.flags & FLAG_IGNORE_FORMAT_ID) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
 	/* reverse swap of bit pairs */
 
@@ -456,7 +456,7 @@ tbe_cw_read_sector(
 		(data[3] >> 4) & 3, (data[3] >> 2) & 3, data[3] & 3) == -1)
 		{
 		verbose(2, "invalid bit pair swap vector on sector %d", sector);
-		dsk_err.errors++;
+		disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, 1);
 		}
 
 	/*
@@ -555,6 +555,7 @@ tbe_cw_write_track(
 
 	if (tbe_write_fill(ffo_l0, &raw_cnt, fmt->tbe_cw.wr.prolog_length) == -1) return (0);
 	for (i = 0; i < fmt->tbe_cw.rw.sectors; i++) if (tbe_cw_write_sector(ffo_l0, &fmt->tbe_cw, &dsk_sct[i], &raw_cnt, track) == -1) return (0);
+	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (tbe_write_fill(ffo_l0, &raw_cnt, fmt->tbe_cw.wr.epilog_length) == -1) return (0);
 	fifo_set_flags(ffo_l0, FIFO_FLAG_WRITABLE);
 	return (1);

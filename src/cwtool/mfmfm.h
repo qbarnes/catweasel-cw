@@ -13,15 +13,14 @@
 #ifndef CWTOOL_MFMFM_H
 #define CWTOOL_MFMFM_H
 
+#include "import.h"
+#include "export.h"
+
 struct fifo;
 struct disk_error;
 
 extern const int			mfmfm_decode_table[];
 extern const int			mfmfm_encode_table[];
-extern int				mfmfm_read_ushort_be(unsigned char *);
-extern int				mfmfm_write_ushort_be(unsigned char *, int);
-extern unsigned long			mfmfm_read_ulong_le(unsigned char *);
-extern int				mfmfm_write_ulong_le(unsigned char *, unsigned long);
 extern int				mfmfm_read_sync(struct fifo *, int, int);
 extern int				mfmfm_read_sync2(struct fifo *, int, int);
 extern int				mfmfm_write_sync(struct fifo *, int, int);
@@ -32,6 +31,11 @@ extern int				mfmfm_crc16(int, const unsigned char *, int);
 extern int				mfmfm_get_sector_shift(unsigned char *, int, int);
 extern int				mfmfm_set_sector_size(unsigned char *, int, int, int);
 extern int				mfmfm_fill_sector_shift(unsigned char *, int, int, int);
+
+#define mfmfm_read_ushort_be(data)		import_ushort_be(data)
+#define mfmfm_write_ushort_be(data, val)	export_ushort_be(data, val)
+#define mfmfm_read_ulong_le(data)		import_ulong_le(data)
+#define mfmfm_write_ulong_le(data, val)		export_ulong_le(data, val)
 
 
 

@@ -1,7 +1,7 @@
 /****************************************************************************
  ****************************************************************************
  *
- * fm.c
+ * export.c
  *
  ****************************************************************************
  ****************************************************************************/
@@ -12,51 +12,58 @@
 
 #include <stdio.h>
 
-#include "fm.h"
+#include "export.h"
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
-#include "disk.h"
-#include "fifo.h"
 
 
 
 /****************************************************************************
- * fm_read_8data_bits
+ * export_ushort_be
  ****************************************************************************/
-int
-fm_read_8data_bits(
-	struct fifo			*ffo_l1,
-	struct disk_error		*dsk_err,
-	int				ofs)
+unsigned char *
+export_ushort_be(
+	unsigned char			*data,
+	int				val)
 
 	{
-	int				data = fifo_read_bits(ffo_l1, 16);
-
-	if (data == -1) return (-1);
-	if ((data & 0xaaaa) != 0xaaaa)
-		{
-		verbose(3, "wrong fm clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
-		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
-		}
-	return ((mfmfm_decode_table[(data >> 8) & 0x55] << 4) | mfmfm_decode_table[data & 0x55]);
+	data[0] = (val >> 8) & 0xff;
+	data[1] = val & 0xff;
+	return (data);
 	}
 
 
 
 /****************************************************************************
- * fm_write_8data_bits
+ * export_ushort_le
  ****************************************************************************/
-int
-fm_write_8data_bits(
-	struct fifo			*ffo_l1,
+unsigned char *
+export_ushort_le(
+	unsigned char			*data,
 	int				val)
 
 	{
-	int				data;
+	data[0] = val & 0xff;
+	data[1] = (val >> 8) & 0xff;
+	return (data);
+	}
 
-	data  = (mfmfm_encode_table[val >> 4] << 8) | mfmfm_encode_table[val & 0x0f];
-	if (fifo_write_bits(ffo_l1, data | 0xaaaa, 16) == -1) return (-1);
-	return (0);
+
+
+/****************************************************************************
+ * export_ulong_le
+ ****************************************************************************/
+unsigned char *
+export_ulong_le(
+	unsigned char			*data,
+	unsigned long			val)
+
+	{
+	data[0] = val & 0xff;
+	data[1] = (val >> 8) & 0xff;
+	data[2] = (val >> 16) & 0xff;
+	data[3] = (val >> 24) & 0xff;
+	return (data);
 	}
 /******************************************************** Karsten Scheibler */

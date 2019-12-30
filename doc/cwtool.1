@@ -10,7 +10,7 @@
 .fi
 ..
 
-.TH cwtool 1 "cw 0.09"
+.TH cwtool 1 "cw 0.10"
 
 .SH NAME
 cwtool \- tool for reading and writing floppy disk images with a Catweasel controller
@@ -65,9 +65,9 @@ cwtool \- tool for reading and writing floppy disk images with a Catweasel contr
 \fBcwtool\fR is the user space companion program for the cw kernel driver module. cw is a package for the Catweasel controller especially for accessing the floppy drives connected to Catweasel. Some preliminary remarks:
 .RS
 .IP * 2
-\fBcwtool\fR uses one number for track numbering, this number contains the hardware track and side. The calculation is rather simple, in most cases it is: 2 * hardware_track + side, the C1571 formats use another numbering scheme: hardware_track + side_offset * side. With the options \-R \-v or \-W \-v you will see such numbers.
+\fBcwtool\fR uses one number for track numbering, this number contains the hardware track and side. The calculation is rather simple, in most cases it is: 2 * hardware_track + side, the C1541 and C1571 formats are using another numbering scheme: hardware_track + side_offset * side. With the options \-R \-v or \-W \-v you will see such numbers.
 .IP * 2
-Options like \-D, \-n, \-f or \-e refer to a configuration. The configuration directives and syntax are currently undocumented, because they may change in future versions.
+Options like \-D, \-n, \-f or \-e refer to a configuration. The configuration syntax currently undocumented, because it may change in future versions.
 .IP * 2
 If you want to use files named \- use ./\-, because otherwise \fBcwtool\fR would use stdin or stdout (depending on the file being source or destination).
 .IP * 2
@@ -76,6 +76,8 @@ If you want to use files named \- use ./\-, because otherwise \fBcwtool\fR would
 If you have problems reading 3.5 inch HD disks written in a DD drive, or if you are unable to read the flip side of a C1541 disk, please consult the README file coming with the source distribution of cw.
 .IP * 2
 Not all formats have been extensively tested, if you have problems please contact the author (the email address is listed in the README of the source distribution).
+.IP * 2
+To allow reading and writing of G64 disk images \fBcwtool\fR has some built\-in magic. Before writing such images to disk unneeded data is stripped away, to shorten the track. Otherwise the track data may be too long and the last bytes of the track would overwrite the SYNC of the first sector. This does only work if the G64 image contains valid CBM sector header ids, if not the data is written unchanged and may be too long. After reading a disk the same routines are used to strip away the track gap. It may be possible that too many data is discarded and the image is unusable (especially disks with copy protection mechanisms may use obscure sector layouts or other things). If you have such disks please send the author an raw image of it (look below how to create one). Additionally after reading the data after an SYNC is also byte aligned, because it seems VICE does not like unaligned data. To see what track stripping and aligning routines are doing use \-v \-v \-v \-v.
 .RE
 
 .SH OPTIONS
@@ -88,7 +90,15 @@ List available disk names and exit.
 .IP "\-S, \-\-statistics" 8
 Print out statistics of a disk, most notably the histogram.
 .IP "\-R, \-\-read" 8
-Read a disk and write the content to an image file.
+Read a disk and write the content to an image file. In combination with \-v a detailed report about bad sectors is given, the format is ss=ee@0xhhhhhh, with:
+.RS
+.IP * 2
+ss \-\- sector number
+.IP * 2
+ee \-\- error description: nf \- not found, en \- encoding error (MFM, GCR, ...), nu \- wrong track/other number, si \- wrong sector size, cs \- checksum error, id \- wrong id, mx \- mixed error
+.IP * 2
+hhhhhh \-\- hexadecimal offset in destination file
+.RE
 .IP "\-W, \-\-write" 8
 Write a disk with content read from an image file.
 .IP "\-h, \-\-help" 8
@@ -104,7 +114,7 @@ Evaluate the given string \fI<config>\fR as configuration parameters.
 .IP "\-r \fI<num>\fR, \-\-retry \fI<num>\fR" 8
 Retry \fI<num>\fR times on read errors.
 .IP "\-s, \-\-ignore\-size" 8
-Do not check if input file is larger than needed and do not warn if it is smaller.
+Do not check if source file contains more or less bytes than needed.
 
 .SH EXAMPLES
 .IP "1." 8
@@ -185,6 +195,12 @@ Format an Amiga DD disk with all sectors containing random data.
 \&        /dev/cw0raw0 /dev/null 2> log
 .Ve
 Write a more verbose report of what happened while reading an Amiga DD disk to log, do not retry on disk errors.
+
+.IP "12." 8
+.Vb
+\&\fBcwtool\fR \-W \-v c1541_42_g64 image.g64 /dev/cw2raw1
+.Ve
+Write a C1541 disk with the content read from image.g64 to the second floppy drive of the third controller. If image.g64 contains more or less than the needed 42 tracks you will get warnings.
 
 .SH AUTHOR
 Karsten Scheibler

@@ -13,6 +13,7 @@
 #ifndef CWTOOL_FORMAT_H
 #define CWTOOL_FORMAT_H
 
+#include "gcr_g64.h"
 #include "gcr_cbm.h"
 #include "gcr_apple.h"
 #include "fm_nec765.h"
@@ -23,6 +24,7 @@
 
 union format
 	{
+	struct gcr_g64			gcr_g64;
 	struct gcr_cbm			gcr_cbm;
 	struct gcr_apple		gcr_apl;
 	struct fm_nec765		fm_nec;

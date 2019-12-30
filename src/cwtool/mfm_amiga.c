@@ -86,10 +86,8 @@ mfm_amiga_unshuffle(
 	debug_error_condition(len > sizeof (tmp));
 	for (i = k = 0, j = len / 2; k < len; i++, j++)
 		{
-		tmp[k++] = (mfm_encode_table[data[i] >>   4] << 1) |
-			mfm_encode_table[data[j] >>   4];
-		tmp[k++] = (mfm_encode_table[data[i] & 0x0f] << 1) |
-			mfm_encode_table[data[j] & 0x0f];
+		tmp[k++] = (mfm_encode_table[data[i] >>   4] << 1) | mfm_encode_table[data[j] >>   4];
+		tmp[k++] = (mfm_encode_table[data[i] & 0x0f] << 1) | mfm_encode_table[data[j] & 0x0f];
 		}
 	for (i = 0; i < len; i++) data[i] = tmp[i];
 	}
@@ -106,10 +104,10 @@ mfm_amiga_checksum(
 
 	{
 	int				i;
-	unsigned long			val, *data2 = (unsigned long *) data;
+	unsigned long			val;
 
 	debug_error_condition((len % 4) != 0);
-	for (val = i = 0, len /= 4; i < len; i++) val ^= data2[i];
+	for (val = i = 0; i < len; i += 4) val ^= mfm_read_ulong_le(&data[i]);
 	val = ((val >> 1) & 0x55555555) ^ (val & 0x55555555);
 	return (val);
 	}
@@ -200,18 +198,18 @@ mfm_amiga_read_sector(
 	result = format_compare2("header xor checksum: got 0x%08x, expected: 0x%08x", mfm_read_ulong_le(&data[20]), mfm_amiga_checksum(data, 20));
 	result += format_compare2("data xor checksum: got 0x%08x, expected: 0x%08x", mfm_read_ulong_le(&data[24]), mfm_amiga_checksum(&data[28], 512));
 	if (result > 0) verbose(2, "checksum error on sector %d", sector);
-	if (mfm_amg->rd.flags & FLAG_IGNORE_CHECKSUMS) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_amg->rd.flags & FLAG_IGNORE_CHECKSUMS) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_CHECKSUM, result);
 
 	result = format_compare2("track: got %d, expected %d", data[1], track);
 	if (result > 0) verbose(2, "track mismatch on sector %d", sector);
-	if (mfm_amg->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_amg->rd.flags & FLAG_IGNORE_TRACK_MISMATCH) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_NUMBERING, result);
 
 	result = format_compare2("format_byte: got 0x%02x, expected 0x%02x", data[0], mfm_amg->rw.format_byte);
 	if (result > 0) verbose(2, "wrong format_byte on sector %d", sector);
-	if (mfm_amg->rd.flags & FLAG_IGNORE_FORMAT_BYTE) dsk_err.warnings += result;
-	else dsk_err.errors += result;
+	if (mfm_amg->rd.flags & FLAG_IGNORE_FORMAT_BYTE) disk_warning_add(&dsk_err, result);
+	else disk_error_add(&dsk_err, DISK_ERROR_FLAG_ID, result);
 
 	/*
 	 * if the found sector is of better quality than the current one
@@ -310,6 +308,7 @@ mfm_amiga_write_track(
 
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_amg.wr.prolog_value, fmt->mfm_amg.wr.prolog_length) == -1) return (0);
 	for (i = 0; i < fmt->mfm_amg.rw.sectors; i++) if (mfm_amiga_write_sector(&ffo_l1, &fmt->mfm_amg, &dsk_sct[i], track) == -1) return (0);
+	fifo_set_rd_ofs(ffo_l3, fifo_get_wr_ofs(ffo_l3));
 	if (mfm_write_fill(&ffo_l1, fmt->mfm_amg.wr.epilog_value, fmt->mfm_amg.wr.epilog_length) == -1) return (0);
 	fifo_write_flush(&ffo_l1);
 	if (raw_write(&ffo_l1, ffo_l0, fmt->mfm_amg.rw.bnd, fmt->mfm_amg.wr.precomp, 3) == -1) return (0);

@@ -1,7 +1,7 @@
 /****************************************************************************
  ****************************************************************************
  *
- * version.h
+ * export.h
  *
  ****************************************************************************
  ****************************************************************************/
@@ -10,13 +10,14 @@
 
 
 
-#ifndef CW_VERSION_H
-#define CW_VERSION_H
+#ifndef CWTOOL_EXPORT_H
+#define CWTOOL_EXPORT_H
 
-#define VERSION				"0.10"
-#define VERSION_DATE			"20060215"
+extern unsigned char			*export_ushort_be(unsigned char *, int);
+extern unsigned char			*export_ushort_le(unsigned char *, int);
+extern unsigned char			*export_ulong_le(unsigned char *, unsigned long);
 
 
 
-#endif /* !CW_VERSION_H */
+#endif /* !CWTOOL_EXPORT_H */
 /******************************************************** Karsten Scheibler */

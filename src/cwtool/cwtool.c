@@ -21,12 +21,13 @@
  *   file may be L0 - L3 depending on the selected format
  * - disk_write() is more or less inverse, source file may be L0 - L3,
  *   depending on selected format, destination file has to be L0
- * - plain image formats as ADF or D64 are L3, G64 would be L1
+ * - plain image formats as ADF or D64 are L3, G64 is L1
  * - config.c translates a textual config file to entries in struct disk
  *   beside the built in directives it also understands format specific
  *   directives passed via struct format_desc
- * - struct fifo is the container for the data, its functions support
- *   bit and byte operations suitable for decoding and encoding
+ * - struct fifo is the container for the data and some side information,
+ *   its functions support bit and byte operations suitable for decoding
+ *   and encoding
  *
  ****************************************************************************
  ****************************************************************************/
@@ -72,8 +73,8 @@
 char					program_name[] = PROGRAM_NAME;
 static int				mode;
 static char				*disk_name;
-static char				*file_src;
-static char				*file_dst;
+static char				*path_src;
+static char				*path_dst;
 static int				params;
 static int				no_rcfiles;
 static char				*config_files[CWTOOL_MAX_CONFIG_FILES];
@@ -121,7 +122,7 @@ config_read_file(
 	{
 	struct file			fil;
 	char				data[CWTOOL_MAX_CONFIG_SIZE];
-	int				mode = (no_error) ? FILE_MODE_READ3 : FILE_MODE_READ;
+	int				mode = (no_error) ? FILE_MODE_READ_RETURN : FILE_MODE_READ;
 	int				size;
 
 	if (! file_open(&fil, path, mode)) return;
@@ -201,7 +202,7 @@ cmd_dump(
 	void)
 
 	{
-	printf("# builtin default config\n%s", config_default);
+	printf("# builtin default config (" VERSION_STRING ")\n\n%s", config_default);
 	}
 
 
@@ -255,7 +256,7 @@ cmd_statistics(
 	struct disk			*dsk)
 
 	{
-	disk_statistics(dsk, file_src);
+	disk_statistics(dsk, path_src);
 	}
 
 
@@ -271,6 +272,86 @@ info_init(
 	info_fh = fdopen(STDERR_FILENO, "a");
 	if (info_fh == NULL) error_perror2("could not reopen stderr");
 	setvbuf(info_fh, NULL, _IONBF, 0);
+	}
+
+
+
+/****************************************************************************
+ * info_error_line
+ ****************************************************************************/
+#define info_error_line(args...)					\
+	do								\
+		{							\
+		if ((verbose_level != 0) || (debug_level != 0))		\
+			{						\
+			verbose(0, args);				\
+			break;						\
+			}						\
+									\
+		/*							\
+		 * using stderr instead of info_fh for line		\
+		 * buffering						\
+		 */							\
+									\
+		fprintf(stderr, args);					\
+		fprintf(stderr, "\n");					\
+		}							\
+	while (0)
+
+
+
+/****************************************************************************
+ * info_error_sector
+ ****************************************************************************/
+static int
+info_error_sector(
+	char				*line,
+	int				max,
+	struct disk_sector_info		*dsk_sct_nfo,
+	int				sector)
+
+	{
+	char				*reason = "mx";
+
+	if (dsk_sct_nfo->flags == DISK_ERROR_FLAG_NOT_FOUND) reason = "nf";
+	if (dsk_sct_nfo->flags == DISK_ERROR_FLAG_ENCODING)  reason = "en";
+	if (dsk_sct_nfo->flags == DISK_ERROR_FLAG_ID)        reason = "id";
+	if (dsk_sct_nfo->flags == DISK_ERROR_FLAG_NUMBERING) reason = "nu";
+	if (dsk_sct_nfo->flags == DISK_ERROR_FLAG_SIZE)      reason = "si";
+	if (dsk_sct_nfo->flags == DISK_ERROR_FLAG_CHECKSUM)  reason = "cs";
+	return (do_snprintf(line, max, " %02d=%s@0x%06x", sector, reason, dsk_sct_nfo->offset));
+	}
+
+
+
+/****************************************************************************
+ * info_error_details
+ ****************************************************************************/
+static void
+info_error_details(
+	struct disk_info		*dsk_nfo)
+
+	{
+	char				line[1024];
+	int				i, l, s, t;
+
+	info_error_line("details for bad sectors:");
+	for (t = 0; t < CWTOOL_MAX_TRACK; t++)
+		{
+		for (i = s = 0; s < CWTOOL_MAX_SECTOR; s++) if (dsk_nfo->sct_nfo[t][s].flags) i++;
+		if (i == 0) continue;
+		for (s = 0; s < CWTOOL_MAX_SECTOR; )
+			{
+			l = do_snprintf(line, sizeof (line), "track %3d:", t);
+			for (i = 0; (i < 4) && (s < CWTOOL_MAX_SECTOR); s++)
+				{
+				if (! dsk_nfo->sct_nfo[t][s].flags) continue;
+				l += info_error_sector(&line[l], sizeof (line) - l, &dsk_nfo->sct_nfo[t][s], s);
+				i++;
+				}
+			if (i > 0) info_error_line(line);
+			}
+		}
 	}
 
 
@@ -321,6 +402,8 @@ info_print(
 	while ((line[i] != '\0') && (space[i] != '\0')) i++;
 	if ((verbose_level != 0) || (debug_level != 0)) verbose(0, "%s", line);
 	else fprintf(info_fh, "%s%s%c", line, &space[i], end);
+
+	if ((summary) && (dsk_nfo->sum.sectors_bad > 0)) info_error_details(dsk_nfo);
 	}
 
 
@@ -336,7 +419,7 @@ cmd_read(
 	int				flags = (ignore_size) ? DISK_OPTION_FLAG_IGNORE_SIZE : DISK_OPTION_FLAG_NONE;
 	struct disk_option		dsk_opt = DISK_OPTION_INIT(info_print, retry, flags);
 
-	disk_read(dsk, &dsk_opt, file_src, file_dst);
+	disk_read(dsk, &dsk_opt, path_src, path_dst);
 	}
 
 
@@ -352,7 +435,7 @@ cmd_write(
 	int				flags = (ignore_size) ? DISK_OPTION_FLAG_IGNORE_SIZE : DISK_OPTION_FLAG_NONE;
 	struct disk_option		dsk_opt = DISK_OPTION_INIT(info_print, retry, flags);
 
-	disk_write(dsk, &dsk_opt, file_src, file_dst);
+	disk_write(dsk, &dsk_opt, path_src, path_dst);
 	}
 
 
@@ -507,8 +590,8 @@ cmdline_parse(
 			if (mode == 0) goto bad_option;
 			if (params >= cmdline_params()) error_message("too many parameters given");
 			if (params == 0) disk_name = arg;
-			if (params == 1) file_src = cmdline_check_stdin("<srcfile>", arg);
-			if (params == 2) file_dst = cmdline_check_stdout("<dstfile>", arg);
+			if (params == 1) path_src = cmdline_check_stdin("<srcfile>", arg);
+			if (params == 2) path_dst = cmdline_check_stdout("<dstfile>", arg);
 			params++;
 			}
 		else if (string_equal(arg, "--"))

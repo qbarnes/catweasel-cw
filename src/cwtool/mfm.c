@@ -41,7 +41,7 @@ mfm_read_8data_bits(
 	if ((clock & 0xaaaa) != 0xaaaa)
 		{
 		verbose(3, "wrong mfm clock bit around bit offset %d (byte %d)", fifo_get_rd_bitofs(ffo_l1), ofs);
-		dsk_err->errors++;
+		disk_error_add(dsk_err, DISK_ERROR_FLAG_ENCODING, 1);
 		}
 	return ((mfmfm_decode_table[(data >> 8) & 0x55] << 4) | mfmfm_decode_table[data & 0x55]);
 	}

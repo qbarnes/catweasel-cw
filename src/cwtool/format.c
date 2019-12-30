@@ -22,6 +22,7 @@
 
 extern struct format_desc		raw_format_desc;
 extern struct format_desc		gcr_cbm_format_desc;
+extern struct format_desc		gcr_g64_format_desc;
 extern struct format_desc		gcr_apple_format_desc;
 extern struct format_desc		fm_nec765_format_desc;
 extern struct format_desc		mfm_nec765_format_desc;
@@ -32,6 +33,7 @@ static struct format_desc		*fmt_dsc[] =
 	{
 	&raw_format_desc,
 	&gcr_cbm_format_desc,
+	&gcr_g64_format_desc,
 	&gcr_apple_format_desc,
 	&fm_nec765_format_desc,
 	&mfm_nec765_format_desc,
