@@ -330,19 +330,31 @@ cwhardware_mk4_firmware_upload(
 	struct cw_hardware		*hrd)
 
 	{
-	int				i, byte, bank, timeout;
+	int				byte, bank, timeout;
+	int				i = 0, version = 0xffff;
 	unsigned char			memtest[] =
 		{
 		1, 2, 4, 8, 16, 32, 64, 128, 255, 44, 65, 3
 		};
 
 	/*
+	 * determine firmware version, no version available if first bytes
+	 * are 0xffff
+	 */
+
+	if (sizeof (cwhardware_mk4_firmware) > 1)
+		{
+		version = (cwhardware_mk4_firmware[0] << 8) | cwhardware_mk4_firmware[1];
+		if (version != 0xffff) i = 2;
+		}
+
+	/*
 	 * this code was written after looking into Dirk Jagdmann's
 	 * cw_probe()-function
 	 */
 
-	cw_debug(1, "[c%d] uploading firmware", hrd->cnt->num);
-	for (i = 0; i < sizeof (cwhardware_mk4_firmware); i++)
+	cw_debug(1, "[c%d] uploading firmware version 0x%04x", hrd->cnt->num, version);
+	for ( ; i < sizeof (cwhardware_mk4_firmware); i++)
 		{
 
 		/* set direction */
@@ -625,13 +637,15 @@ void
 cwhardware_floppy_select(
 	struct cw_hardware		*hrd,
 	int				floppy,
-	int				side)
+	int				side,
+	int				density)
 
 	{
-	cw_debug(1, "[c%d] select, floppy = %d, side = %d", hrd->cnt->num, floppy, side);
+	cw_debug(1, "[c%d] select, floppy = %d, side = %d, density = %d", hrd->cnt->num, floppy, side, density);
 	cntr_reg(get_bit(W_SELECT0), floppy ? 1 : 0);
 	cntr_reg(get_bit(W_SELECT1), floppy ? 0 : 1);
-	cntr_reg_out(get_bit(W_SIDE), side ? 0 : 1);
+	cntr_reg(get_bit(W_SIDE), side ? 0 : 1);
+	cntr_reg_out(get_bit(W_DENSITY), density ? 0 : 1);
 	}
 
 

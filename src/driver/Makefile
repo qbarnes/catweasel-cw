@@ -27,12 +27,17 @@ all:
 
 linux24: ${TARGET24}
 
-linux26: cwmain.c
+linux26: cwmain.c cwfirmware.c
 	CW_DIR=${CWD} ${MAKE} -C ${KERNEL_DIR} M=${CWD} modules && ${CP} cw.ko ${TARGET26}
 
 # Linux 2.6 will create a cw.o containing all *.o files this will conflict
 # with the object file generated from cw.c, so cw.c is simply linked to
 # cwmain.c before compiling
+
+cwfirmware.c: cwfirmware.bin
+	gcc -s -Wall -O2 -o fwdump ../../tools/fwdump.c
+	./fwdump < cwfirmware.bin > cwfirmware.c
+	${RM} fwdump
 
 cwmain.c:
 	${LN} -s cw.c cwmain.c
@@ -40,10 +45,10 @@ cwmain.c:
 %.o: %.c
 	${CC} -c -o $@ $<
 
-${TARGET24}: ${OBJECTS}
+${TARGET24}: ${OBJECTS} cwfirmware.c
 	${LD} -o ${TARGET24} ${OBJECTS}
 
 clean:
 	if [ "${VERSION}" = "26" ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
-	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} cwmain.c *~ *.bak *.ko
+	${RM} ${TARGET24} ${TARGET26} ${OBJECTS} cwmain.c cwfirmware.c *~ *.bak *.ko
 endif

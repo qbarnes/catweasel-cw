@@ -1,9 +1,9 @@
 MAKE=make
-SH=sh
+BASH=bash
 RM=rm -f
-INSTALL=${SH} tools/install.sh
-UPGRADE=${SH} tools/upgrade.sh
-UNINSTALL=${SH} tools/uninstall.sh
+INSTALL=${BASH} tools/install.bash
+UPGRADE=${BASH} tools/upgrade.bash
+UNINSTALL=${BASH} tools/uninstall.bash
 
 .PHONY: all clean
 

@@ -10,7 +10,7 @@
 .fi
 ..
 
-.TH cwtool 1 "cw 0.10"
+.TH cwtool 1 "cw 0.11"
 
 .SH NAME
 cwtool \- tool for reading and writing floppy disk images with a Catweasel controller
@@ -21,6 +21,13 @@ cwtool \- tool for reading and writing floppy disk images with a Catweasel contr
 
 .B cwtool
 \-D
+
+.B cwtool
+\-I
+[\-v]
+[\-n]
+[\-f \fI<file>\fR]
+[\-e \fI<config>\fR]
 
 .B cwtool
 \-L
@@ -47,6 +54,7 @@ cwtool \- tool for reading and writing floppy disk images with a Catweasel contr
 [\-r \fI<num>\fR]
 \fI<diskname>\fR
 \fI<srcfile>\fR
+[\fI<srcfile>\fR ...]
 \fI<dstfile>\fR
 
 .B cwtool
@@ -65,9 +73,9 @@ cwtool \- tool for reading and writing floppy disk images with a Catweasel contr
 \fBcwtool\fR is the user space companion program for the cw kernel driver module. cw is a package for the Catweasel controller especially for accessing the floppy drives connected to Catweasel. Some preliminary remarks:
 .RS
 .IP * 2
-\fBcwtool\fR uses one number for track numbering, this number contains the hardware track and side. The calculation is rather simple, in most cases it is: 2 * hardware_track + side, the C1541 and C1571 formats are using another numbering scheme: hardware_track + side_offset * side. With the options \-R \-v or \-W \-v you will see such numbers.
+\fBcwtool\fR uses one number for track numbering (you see those numbers with the options \-R \-v or \-W \-v). This number contains the hardware track and side. How the conversion is done depends on the configuration of the selected disk format. In some cases the track number is equal to 2 * hardware_track + side.
 .IP * 2
-Options like \-D, \-n, \-f or \-e refer to a configuration. The configuration syntax currently undocumented, because it may change in future versions.
+Options like \-D, \-n, \-f or \-e refer to a configuration. The configuration syntax is currently undocumented, because it may change in future versions.
 .IP * 2
 If you want to use files named \- use ./\-, because otherwise \fBcwtool\fR would use stdin or stdout (depending on the file being source or destination).
 .IP * 2
@@ -77,7 +85,7 @@ If you have problems reading 3.5 inch HD disks written in a DD drive, or if you 
 .IP * 2
 Not all formats have been extensively tested, if you have problems please contact the author (the email address is listed in the README of the source distribution).
 .IP * 2
-To allow reading and writing of G64 disk images \fBcwtool\fR has some built\-in magic. Before writing such images to disk unneeded data is stripped away, to shorten the track. Otherwise the track data may be too long and the last bytes of the track would overwrite the SYNC of the first sector. This does only work if the G64 image contains valid CBM sector header ids, if not the data is written unchanged and may be too long. After reading a disk the same routines are used to strip away the track gap. It may be possible that too many data is discarded and the image is unusable (especially disks with copy protection mechanisms may use obscure sector layouts or other things). If you have such disks please send the author an raw image of it (look below how to create one). Additionally after reading the data after an SYNC is also byte aligned, because it seems VICE does not like unaligned data. To see what track stripping and aligning routines are doing use \-v \-v \-v \-v.
+To allow reading and writing of G64 disk images \fBcwtool\fR has some built\-in magic. Before writing such images to disk unneeded data is stripped away, to shorten the track. Otherwise the track data may be too long and the last bytes of the track would overwrite the SYNC of the first sector. This does only work if the G64 image contains valid CBM sector header ids, if not the data is written unchanged and may be too long. After reading a disk the same routines are used to strip away the track gap. It may be possible that too many data is discarded and the image is unusable (especially disks with copy protection mechanisms may use obscure sector layouts or other things). If you have such disks please send the author a raw image of it (look below how to create one). Additionally after reading the data after a SYNC is also byte aligned, because it seems VICE does not like unaligned data. To see what track stripping and aligning routines are doing use \-v \-v \-v \-v.
 .RE
 
 .SH OPTIONS
@@ -85,6 +93,8 @@ To allow reading and writing of G64 disk images \fBcwtool\fR has some built\-in 
 Print out version and exit.
 .IP "\-D, \-\-dump" 8
 Dump builtin config and exit.
+.IP "\-I, \-\-initialize" 8
+Initialize the configured devices.
 .IP "\-L, \-\-list" 8
 List available disk names and exit.
 .IP "\-S, \-\-statistics" 8
@@ -158,10 +168,10 @@ Write image.adf to disk, read it in and compare with the original data, if there
 
 .IP "7." 8
 .Vb
-\&\fBcwtool\fR \-R \-v raw_14 /dev/cw0raw0 \- |
+\&\fBcwtool\fR \-R \-r 0 \-v raw_14 /dev/cw0raw0 \- |
 \&\fBbzip2\fR \-c \- > image.cwraw.bz2
 .Ve
-Read a disk with 14 MHz and compress the data on the fly. The written data is in raw format, this means it contains just the values \fBcwtool\fR got from the kernel driver. This is useful for later analysis of the disk format, if the format is currently not supported by \fBcwtool\fR (DD disks should be read with raw_14 and HD disks with raw_28).
+Read a disk with 14 MHz and compress the data on the fly. The written data is in raw format, this means it contains just the values \fBcwtool\fR got from the kernel driver. This is useful for later analysis of the disk format, if the format is currently not supported by \fBcwtool\fR. DD disks should be read with raw_14 and HD disks with raw_28. Giving higher values to \-r means that more copies of every track will be saved. This will enlarge the raw image files noticeable.
 
 .IP "8." 8
 .Vb
@@ -181,7 +191,7 @@ Read track 120 (hardware track 60, first side) of a disk with 28 MHz, print out 
 .Vb
 \&\fBcwtool\fR \-W \-v msdos_hd /dev/zero /dev/cw0raw0
 .Ve
-Format an MSDOS HD disk with all sectors containing zero.
+Format an MSDOS HD disk with all sectors containing zeros.
 
 .IP "10." 8
 .Vb
@@ -201,6 +211,18 @@ Write a more verbose report of what happened while reading an Amiga DD disk to l
 \&\fBcwtool\fR \-W \-v c1541_42_g64 image.g64 /dev/cw2raw1
 .Ve
 Write a C1541 disk with the content read from image.g64 to the second floppy drive of the third controller. If image.g64 contains more or less than the needed 42 tracks you will get warnings.
+
+.IP "13." 8
+.Vb
+\&\fBcwtool\fR \-I \-f \- <<EOC
+\&drive \*(Q"/dev/cw0raw0\*(Q"
+\&        {
+\&        ignore_diskchange yes
+\&        double_step yes
+\&        }
+\&EOC
+.Ve
+This instructs the driver to not check if an index pulse is present or not. This also means that the driver always reads from the drive, regardless if there is a disk or not. This is especially useful to read the flip side of C1541 disks with an unmodified 360K drive.
 
 .SH AUTHOR
 Karsten Scheibler

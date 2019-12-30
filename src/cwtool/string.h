@@ -15,7 +15,8 @@
 
 extern int				string_equal(const char *, const char *);
 extern int				string_length(const char *);
-extern void				string_copy(char *, const char *);
+extern char				*string_copy(char *, int, const char *);
+extern char				*string_dot(char *, int, char *);
 
 
 

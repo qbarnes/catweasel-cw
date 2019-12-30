@@ -16,7 +16,6 @@
 #include "error.h"
 #include "debug.h"
 #include "verbose.h"
-#include "bounds.h"
 
 
 
@@ -99,9 +98,9 @@ setvalue_short(
 int
 setvalue_uint(
 	unsigned int			*dst,
-	int				val,
-	int				low,
-	int				high)
+	unsigned int			val,
+	unsigned int			low,
+	unsigned int			high)
 
 	{
 	if ((val < low) || (val > high)) return (0);
@@ -112,20 +111,19 @@ setvalue_uint(
 
 
 /****************************************************************************
- * setvalue_bounds
+ * setvalue_uint_bit
  ****************************************************************************/
 int
-setvalue_bounds(
-	struct bounds			*bnd,
-	int				val,
-	int				ofs)
+setvalue_uint_bit(
+	unsigned int			*dst,
+	unsigned int			val,
+	unsigned int			bit)
 
 	{
-	int				i = ofs % 3, j = ofs / 3;
-	struct bounds			*bnd_last = (j > 0) ? &bnd[j - 1] : NULL;
-
-	if (i == 0) return (bounds_set_read_low(bnd_last, &bnd[j], val));
-	if (i == 1) return (bounds_set_write(&bnd[j], val));
-	return (bounds_set_read_high(&bnd[j], val));
+	debug_error_condition((bit < 0) || (bit > 0x80000000) || ((bit & (bit - 1)) != 0));
+	if (val == 0) *dst &= ~bit;
+	else if (val == 1) *dst |= bit;
+	else return (0);
+	return (1);
 	}
 /******************************************************** Karsten Scheibler */

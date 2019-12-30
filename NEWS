@@ -1,7 +1,38 @@
+cw 0.11-20060806
+	* changed handling of raw images. raw images created with the current
+	  version are not compatible with earlier versions of cwtool, but it
+	  is still possible to read older raw images with the current cwtool.
+	  the -r option is now important with raw images, because multiple
+	  instances of the same track may now be saved
+	* it is now possible to give more than one source file to -R, if
+	  reading from the first source still gives errors, the others are
+	  tried in the given order. with this feature you may create raw
+	  images of the same disk with different drives and then try to get
+	  the most out of them
+	* 'make install' should now add static entries for udev, but it was
+	  only tested with SuSE 10.0 and 10.1, please consult the README
+	* special support for D64 images with optionl error information was
+	  added
+	* added configuration c1541_d64, c1541_40_d64 and c1541_42_d64 for
+	  D64 disk images with 35, 40 and 42 tracks
+	* support for 360K drives was added (thanks to Jarkko Lethi for
+	  supplying such a drive). those drives typically operate with 300
+	  rpm instead of 360 rpm like the 1.2M drives do
+	* added configuration c1541_300, c1541_40_300, c1541_42_300,
+	  c1541_d64_300, c1541_40_d64_300, c1541_42_d64_300, c1541_g64_300,
+	  c1541_40_g64_300 and c1541_42_g64_300. these formats are an
+	  interims solution to support drives with 300 rpm especially with
+	  C1541 formats. but do not rely on the existence of these formats
+	  in future versions, the handling of drives with different rpm's
+	  may change again
+	* added configuration mac_5.25 for Apple IIe 5.25" disks (thanks
+	  to Stefan A. Haubenthal for supplying a raw image)
+
 cw 0.10-20060215
-	* added configuration amiga_dd_5.25 for Amiga 5.25" DD
+	* added configuration amiga_dd_5.25 for Amiga 5.25" DD (thanks to
+	  Oliver Stabel for supplying a raw image)
 	* added configuration mac_hd for Mac 3.5" HD disks (same as msdos_hd)
-	* added support for G64 disk images, only images with one speed
+	* added support for G64 disk images, only images with one speed zone
 	  per track are supported, please read the man page for more
 	* added configuration c1541_g64, c1541_40_g64 and c1541_42_g64 for
 	  G64 disk images with 35, 40 and 42 tracks

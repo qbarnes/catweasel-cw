@@ -23,11 +23,13 @@
 
 extern struct image_desc		image_raw_desc;
 extern struct image_desc		image_g64_desc;
+extern struct image_desc		image_d64_desc;
 extern struct image_desc		image_plain_desc;
 static struct image_desc		*img_dsc[] =
 	{
 	&image_raw_desc,
 	&image_g64_desc,
+	&image_d64_desc,
 	&image_plain_desc,
 	NULL
 	};
@@ -51,19 +53,50 @@ image_search_desc(
 
 
 /****************************************************************************
- * image_init
+ * image_open
  ****************************************************************************/
 int
-image_init(
-	struct image			*img,
+image_open(
+	union image			*img,
+	struct file			*fil,
+	char				*path,
 	int				mode)
 
 	{
-	*img = (struct image) { };
-	if (mode == IMAGE_MODE_READ_IGNORE_SIZE) mode = FILE_MODE_READ, img->ignore_size = 1;
-	else if (mode == IMAGE_MODE_READ)        mode = FILE_MODE_READ;
-	else if (mode == IMAGE_MODE_WRITE)       mode = FILE_MODE_WRITE;
-	else debug_error();
-	return (mode);
+	debug_error_condition((mode != IMAGE_MODE_READ) && (mode != IMAGE_MODE_WRITE));
+	mode = (mode == IMAGE_MODE_READ) ? FILE_MODE_READ : FILE_MODE_CREATE;
+
+	/*
+	 * clearing img also means clearing fil, because fil is part of img
+	 * (as part of the structs contained in union image). so order is
+	 * important
+	 */
+
+	*img = (union image) { };
+	file_open(fil, path, mode, FILE_FLAG_NONE);
+	return (1);
+	}
+
+
+
+/****************************************************************************
+ * image_close
+ ****************************************************************************/
+int
+image_close(
+	union image			*img,
+	struct file			*fil)
+
+	{
+
+	/*
+	 * clearing img also means clearing fil, because fil is part of img
+	 * (as part of the structs contained in union image). so order is
+	 * important
+	 */
+
+	file_close(fil);
+	*img = (union image) { };
+	return (1);
 	}
 /******************************************************** Karsten Scheibler */

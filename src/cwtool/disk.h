@@ -17,15 +17,15 @@
 #include "image.h"
 #include "format.h"
 
-#define DISK_TRACK_INIT			(struct disk_track) { .img_trk = IMAGE_TRACK_INIT(500) }
+#define DISK_TRACK_INIT			(struct disk_track) { .img_trk = IMAGE_TRACK_INIT(CW_DEFAULT_TIMEOUT) }
 
 struct disk_track
 	{
-	struct image_track		img_trk;
-	struct format_desc		*fmt_dsc;
 	unsigned char			skew;
 	unsigned char			interleave;
 	unsigned char			reserved[2];
+	struct image_track		img_trk;
+	struct format_desc		*fmt_dsc;
 	union format			fmt;
 	};
 
@@ -49,6 +49,11 @@ struct disk
 #define DISK_ERROR_FLAG_NUMBERING	(1 << 3)
 #define DISK_ERROR_FLAG_SIZE		(1 << 4)
 #define DISK_ERROR_FLAG_CHECKSUM	(1 << 5)
+
+/*
+ * UGLY: cosmetical: current naming of struct disk_error, instead
+ *       struct disk_sector_error ?
+ */
 
 struct disk_error
 	{
@@ -82,6 +87,7 @@ struct disk_sector_info
 
 struct disk_info
 	{
+	char				path[CWTOOL_MAX_PATH_LEN];
 	int				track;
 	int				try;
 	int				sectors_good;
@@ -117,9 +123,7 @@ extern int				disk_set_name(struct disk *, const char *);
 extern int				disk_set_info(struct disk *, const char *);
 extern int				disk_set_track(struct disk *, struct disk_track *, int);
 extern int				disk_set_format(struct disk_track *, struct format_desc *);
-extern int				disk_set_indexed_read(struct disk_track *, int);
-extern int				disk_set_indexed_write(struct disk_track *, int);
-extern int				disk_set_flip_side(struct disk_track *, int);
+extern int				disk_set_image_track_flag(struct disk_track *, int, int);
 extern int				disk_set_clock(struct disk_track *, int);
 extern int				disk_set_side_offset(struct disk_track *, int);
 extern int				disk_set_timeout_read(struct disk_track *, int);
@@ -132,9 +136,8 @@ extern int				disk_set_interleave(struct disk_track *, int);
 extern int				disk_set_sector_number(struct disk_sector *, int);
 extern int				disk_get_sector_number(struct disk_sector *);
 extern int				disk_get_sectors(struct disk_track *);
-extern int				disk_get_version(void);
-extern char				*disk_get_name(struct disk *);
-extern char				*disk_get_info(struct disk *);
+extern const char			*disk_get_name(struct disk *);
+extern const char			*disk_get_info(struct disk *);
 extern struct format_desc		*disk_get_format(struct disk_track *);
 extern struct format_option		*disk_get_read_options(struct disk_track *);
 extern struct format_option		*disk_get_write_options(struct disk_track *);
@@ -143,9 +146,14 @@ extern int				disk_error_add(struct disk_error *, int, int);
 extern int				disk_warning_add(struct disk_error *, int);
 extern int				disk_sector_read(struct disk_sector *, struct disk_error *, unsigned char *);
 extern int				disk_sector_write(unsigned char *, struct disk_sector *);
-extern int				disk_statistics(struct disk *, const char *);
-extern int				disk_read(struct disk *, struct disk_option *, const char *, const char *);
-extern int				disk_write(struct disk *, struct disk_option *, const char *, const char *);
+extern int				disk_statistics(struct disk *, char *);
+extern int				disk_read(struct disk *, struct disk_option *, char **, int, char *);
+extern int				disk_write(struct disk *, struct disk_option *, char *, char *);
+
+#define disk_set_indexed_read(t, v)	disk_set_image_track_flag(t, v, IMAGE_TRACK_FLAG_INDEXED_READ)
+#define disk_set_indexed_write(t, v)	disk_set_image_track_flag(t, v, IMAGE_TRACK_FLAG_INDEXED_WRITE)
+#define disk_set_flip_side(t, v)	disk_set_image_track_flag(t, v, IMAGE_TRACK_FLAG_FLIP_SIDE)
+#define disk_set_optional(t, v)		disk_set_image_track_flag(t, v, IMAGE_TRACK_FLAG_OPTIONAL)
 
 
 

@@ -18,7 +18,8 @@
 /* writable in the sense of "writable to a catweasel device" */
 
 #define FIFO_FLAG_WRITABLE		(1 << 0)
-#define FIFO_FLAG_INDEXED		(1 << 1)
+#define FIFO_FLAG_INDEX_STORED		(1 << 1)
+#define FIFO_FLAG_INDEX_ALIGNED		(1 << 2)
 
 struct fifo
 	{

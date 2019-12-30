@@ -28,7 +28,7 @@ extern void				cwhardware_floppy_mux_on(struct cw_hardware *);
 extern void				cwhardware_floppy_mux_off(struct cw_hardware *);
 extern void				cwhardware_floppy_motor_on(struct cw_hardware *, int);
 extern void				cwhardware_floppy_motor_off(struct cw_hardware *, int);
-extern void				cwhardware_floppy_select(struct cw_hardware *, int, int);
+extern void				cwhardware_floppy_select(struct cw_hardware *, int, int, int);
 extern void				cwhardware_floppy_step(struct cw_hardware *, int, int);
 extern int				cwhardware_floppy_track0(struct cw_hardware *);
 extern int				cwhardware_floppy_write_protected(struct cw_hardware *);

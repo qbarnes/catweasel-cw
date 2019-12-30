@@ -13,14 +13,14 @@
 #ifndef CWTOOL_FORMAT_H
 #define CWTOOL_FORMAT_H
 
-#include "gcr_g64.h"
-#include "gcr_cbm.h"
-#include "gcr_apple.h"
-#include "fm_nec765.h"
-#include "mfm_nec765.h"
-#include "mfm_amiga.h"
-#include "tbe_cw.h"
-#include "fill.h"
+#include "format/gcr_g64.h"
+#include "format/gcr_cbm.h"
+#include "format/gcr_apple.h"
+#include "format/fm_nec765.h"
+#include "format/mfm_nec765.h"
+#include "format/mfm_amiga.h"
+#include "format/tbe_cw.h"
+#include "format/fill.h"
 
 union format
 	{
@@ -34,13 +34,21 @@ union format
 	struct fill			fll;
 	};
 
-#define FORMAT_OPTION(n, m, p)		{ .name = n, .magic = m, .params = p }
+#define FORMAT_FLAG_NONE		0
+#define FORMAT_FLAG_GREEDY		(1 << 0)
+
+#define FORMAT_OPTION_TYPE_BOOLEAN	1
+#define FORMAT_OPTION_TYPE_INTEGER	2
+#define FORMAT_OPTION_BOOLEAN(n, m, p)	{ .name = n, .magic = m, .params = p, .type = FORMAT_OPTION_TYPE_BOOLEAN }
+#define FORMAT_OPTION_INTEGER(n, m, p)	{ .name = n, .magic = m, .params = p, .type = FORMAT_OPTION_TYPE_INTEGER }
+#define FORMAT_OPTION_END		{ .name = NULL, .magic = 0, .params = 0, .type = 0 }
 
 struct format_option
 	{
 	char				*name;
 	int				magic;
 	int				params;
+	int				type;
 	};
 
 struct fifo;
@@ -56,6 +64,7 @@ struct format_desc
 	int				(*set_rw_option)(union format *, int, int, int);
 	int				(*get_sectors)(union format *);
 	int				(*get_sector_size)(union format *, int);
+	int				(*get_flags)(union format *);
 	int				(*track_statistics)(union format *, struct fifo *, int);
 	int				(*track_read)(union format *, struct fifo *, struct fifo *, struct disk_sector *, int);
 	int				(*track_write)(union format *, struct fifo *, struct disk_sector *, struct fifo *, int);

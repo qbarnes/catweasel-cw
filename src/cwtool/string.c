@@ -16,6 +16,9 @@
 
 
 #include "string.h"
+#include "error.h"
+#include "debug.h"
+#include "verbose.h"
 
 
 
@@ -53,12 +56,44 @@ string_length(
 /****************************************************************************
  * string_copy
  ****************************************************************************/
-void
+char *
 string_copy(
 	char				*dest,
+	int				size,
 	const char			*src)
 
 	{
-	while ((*dest++ = *src++) != '\0') ;
+	char				*result = dest;
+
+	do
+		{
+		if (--size < 0) error_message("string_copy() size exceeded");
+		}
+	while ((*dest++ = *src++) != '\0');
+	return (result);
+	}
+
+
+
+/****************************************************************************
+ * string_dot
+ ****************************************************************************/
+char *
+string_dot(
+	char				*dest,
+	int				size,
+	char				*src)
+
+	{
+	int				i;
+
+	debug_error_condition(size < 4);
+	if (string_length(src) < size) return (src);
+	for (i = 0; i < size - 4; i++) dest[i] = src[i];
+	dest[size - 4] = '.';
+	dest[size - 3] = '.';
+	dest[size - 2] = '.';
+	dest[size - 1] = '\0';
+	return (dest);
 	}
 /******************************************************** Karsten Scheibler */
