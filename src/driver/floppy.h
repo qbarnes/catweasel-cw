@@ -51,6 +51,8 @@ struct cw_floppy
 	int				motor;
 	int				motor_request;
 	struct timer_list		motor_timer;
+	wait_queue_head_t		step_wq;
+	struct timer_list		step_timer;
 	cw_raw_t			*track_data;
 	struct cw_floppyinfo		fli;
 	};
@@ -63,8 +65,6 @@ struct cw_floppies
 	volatile int			open;
 	int				busy;
 	wait_queue_head_t		busy_wq;
-	wait_queue_head_t		step_wq;
-	struct timer_list		step_timer;
 	int				mux;
 	struct timer_list		mux_timer;
 	int				rw_latch;
