@@ -58,9 +58,12 @@ config.o: cwtoolrc.c
 %.o: %.c
 	${CC} -c -o $@ $<
 
-${TARGET}: ${OBJECTS}
+${TARGET}: ${OBJECTS} | ${BUILD_BIN_DIR}
 	${CC} -o ${TARGET} ${OBJECTS} ${LIBRARIES}
 	${STRIP} ${TARGET} || true
+
+${BUILD_BIN_DIR}:
+	mkdir -p -- '$@'
 
 clean:
 	${RM} ${TARGET} ${OBJECTS} cwtoolrc.c *~ *.bak

@@ -36,9 +36,9 @@ ifndef STANDALONE
 all:
 	if [ ${VERSION} -ge 26 ]; then ${MAKE} linux26; else ${MAKE} linux24; fi
 
-linux24: config.h firmware.c ${TARGET24}
+linux24: config.h firmware.c ${TARGET24} | ${BUILD_MODULE_DIR}
 
-linux26: config.h firmware.c
+linux26: config.h firmware.c | ${BUILD_MODULE_DIR}
 	CW_DIR=${CWD} ${MAKE} -C ${KERNEL_DIR} M=${CWD} modules && ${CP} cw.ko ${TARGET26}
 
 config.h:
@@ -52,6 +52,9 @@ firmware.c: firmware.bin
 
 ${TARGET24}: ${OBJECTS}
 	${LD} -o ${TARGET24} ${OBJECTS}
+
+${BUILD_MODULE_DIR}:
+	mkdir -p -- '$@'
 
 clean:
 	if [ ${VERSION} -ge 26 ]; then ${MAKE} -C ${KERNEL_DIR} M=${CWD} clean; fi
