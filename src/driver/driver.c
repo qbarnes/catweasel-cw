@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/device.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
@@ -33,14 +34,34 @@
 #define CW_FLAG_MK2_REGISTERED		(1 << 2)
 #define CW_FLAG_MK3_REGISTERED		(1 << 3)
 #define CW_FLAG_MK4_REGISTERED		(1 << 4)
+#define CW_FLAG_CLASS_REGISTERED	(1 << 5)
+#define CW_FLAG_DEVICES_CREATED		(1 << 6)
 
 
 
 cw_int_t				cw_debug_level = 0;
 cw_int_t				cw_major = 120;
 cw_int_t				cw_mk2_ports[CW_NR_CONTROLLERS + 1] = { };
+static struct class			*dev_class;
 static cw_count_t			cw_driver_controllers;
 static cw_flag_t			cw_driver_flags;
+
+
+
+/****************************************************************************
+ * cw_class_devnode
+ ****************************************************************************/
+static char *
+cw_class_devnode(
+	struct device	*dev,
+	umode_t		*mode)
+
+	{
+	if (mode)
+		*mode = 0666;
+
+	return NULL;
+	}
 
 
 
@@ -164,6 +185,15 @@ cw_driver_module_exit(
 	if (cw_driver_flags & CW_FLAG_MK3_REGISTERED) pci_unregister_driver(&cw_hardware_mk3_pci_driver);
 	if (cw_driver_flags & CW_FLAG_MK4_REGISTERED) pci_unregister_driver(&cw_hardware_mk4_pci_driver);
 #endif /* CONFIG_PCI */
+	if (cw_driver_flags & CW_FLAG_DEVICES_CREATED)
+		{
+		for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
+			{
+			int	cw_minor = ((f+1) * 32) - 1;
+			device_destroy(dev_class, MKDEV(cw_major, cw_minor));
+			}
+		}
+	if (cw_driver_flags & CW_FLAG_CLASS_REGISTERED) class_destroy(dev_class);
 	if (cw_driver_flags & CW_FLAG_CHRDEV_REGISTERED) unregister_chrdev(cw_major, CW_NAME);
 	}
 
@@ -217,6 +247,15 @@ cw_driver_module_init(
 	if ((result < 0) && (result != -ENODEV)) goto error;
 #endif /* CONFIG_PCI */
 
+	dev_class = class_create(THIS_MODULE, "catweasel");
+	if(IS_ERR(dev_class))
+		{
+		cw_error("Cannot create catweasel class\n");
+		goto error;
+		}
+	dev_class->devnode = cw_class_devnode;
+	cw_driver_flags |= CW_FLAG_CLASS_REGISTERED;
+
 	/* initialize floppies on all found controllers */
 
 	for (c = ready = 0; c < cw_driver_controllers; c++)
@@ -226,11 +265,31 @@ cw_driver_module_init(
 		result = cw_floppy_init(fls);
 		if (result < 0) goto error;
 		ready++;
+		for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
+			{
+			int	cw_minor;
+			dev_t	cw_dev;
+
+			cw_minor = ((f+1) * 32) - 1;
+			cw_dev = MKDEV(cw_major, cw_minor);
+			if(IS_ERR(device_create(dev_class, NULL, cw_dev,
+				NULL, "cw%draw%d", c, f)))
+				{
+				cw_error("Cannot create catweasel device"
+					 "cw%draw%d\n", c, f);
+				goto error;
+
+				}
+			}
 		}
 
 	/* check if at least one controller is ready */
 
-	if (ready > 0) return (0);
+	if (ready > 0)
+		{
+		cw_driver_flags |= CW_FLAG_DEVICES_CREATED;
+		return (0);
+		}
 	result = -ENODEV;
 	cw_error("no catweasel hardware found");
 error:
