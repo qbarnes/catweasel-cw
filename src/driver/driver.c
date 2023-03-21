@@ -177,6 +177,16 @@ cw_driver_module_exit(
 		{
 		fls = cw_driver_get_floppies(c);
 		if (fls == NULL) continue;
+		if (cw_driver_flags & CW_FLAG_DEVICES_CREATED)
+			{
+			for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
+				{
+				int	cw_minor = (c * 64) + ((f+1) * 32) - 1;
+				dev_t	cw_dev   = MKDEV(cw_major, cw_minor);
+
+				device_destroy(dev_class, cw_dev);
+				}
+			}
 		cw_floppy_exit(fls);
 		}
 
@@ -185,14 +195,6 @@ cw_driver_module_exit(
 	if (cw_driver_flags & CW_FLAG_MK3_REGISTERED) pci_unregister_driver(&cw_hardware_mk3_pci_driver);
 	if (cw_driver_flags & CW_FLAG_MK4_REGISTERED) pci_unregister_driver(&cw_hardware_mk4_pci_driver);
 #endif /* CONFIG_PCI */
-	if (cw_driver_flags & CW_FLAG_DEVICES_CREATED)
-		{
-		for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
-			{
-			int	cw_minor = ((f+1) * 32) - 1;
-			device_destroy(dev_class, MKDEV(cw_major, cw_minor));
-			}
-		}
 	if (cw_driver_flags & CW_FLAG_CLASS_REGISTERED) class_destroy(dev_class);
 	if (cw_driver_flags & CW_FLAG_CHRDEV_REGISTERED) unregister_chrdev(cw_major, CW_NAME);
 	}
@@ -267,11 +269,9 @@ cw_driver_module_init(
 		ready++;
 		for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
 			{
-			int	cw_minor;
-			dev_t	cw_dev;
+			int	cw_minor = (c * 64) + ((f+1) * 32) - 1;
+			dev_t	cw_dev   = MKDEV(cw_major, cw_minor);
 
-			cw_minor = ((f+1) * 32) - 1;
-			cw_dev = MKDEV(cw_major, cw_minor);
 			if(IS_ERR(device_create(dev_class, NULL, cw_dev,
 				NULL, "cw%draw%d", c, f)))
 				{
@@ -280,16 +280,13 @@ cw_driver_module_init(
 				goto error;
 
 				}
+			cw_driver_flags |= CW_FLAG_DEVICES_CREATED;
 			}
 		}
 
 	/* check if at least one controller is ready */
 
-	if (ready > 0)
-		{
-		cw_driver_flags |= CW_FLAG_DEVICES_CREATED;
-		return (0);
-		}
+	if (ready > 0) return (0);
 	result = -ENODEV;
 	cw_error("no catweasel hardware found");
 error:
