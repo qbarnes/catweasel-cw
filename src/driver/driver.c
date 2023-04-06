@@ -179,7 +179,9 @@ cw_driver_module_exit(
 		if (fls == NULL) continue;
 		if (cw_driver_flags & CW_FLAG_DEVICES_CREATED)
 			{
-			for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
+			int	f;
+
+			for (f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
 				{
 				int	cw_minor = (c * 64) + ((f+1) * 32) - 1;
 				dev_t	cw_dev   = MKDEV(cw_major, cw_minor);
@@ -262,12 +264,14 @@ cw_driver_module_init(
 
 	for (c = ready = 0; c < cw_driver_controllers; c++)
 		{
+		int	f;
+
 		fls = cw_driver_get_floppies(c);
 		if (fls == NULL) continue;
 		result = cw_floppy_init(fls);
 		if (result < 0) goto error;
 		ready++;
-		for (int f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
+		for (f = 0; f < CW_NR_FLOPPIES_PER_CONTROLLER; ++f)
 			{
 			int	cw_minor = (c * 64) + ((f+1) * 32) - 1;
 			dev_t	cw_dev   = MKDEV(cw_major, cw_minor);
