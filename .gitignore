@@ -1,0 +1,17 @@
+*.o
+*.ko
+*.mod
+*.mod.c
+*.cmd
+Module.symvers
+modules.order
+src/cwtool/cwtoolrc.c
+src/driver/config.h
+src/driver/firmware.c
+bin/
+cscope.in.out
+cscope.po.out
+cscope.out
+cscope.files
+tags
+
