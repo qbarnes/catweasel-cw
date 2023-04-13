@@ -53,8 +53,12 @@ static cw_flag_t			cw_driver_flags;
  ****************************************************************************/
 static char *
 cw_class_devnode(
-	struct device	*dev,
-	umode_t		*mode)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,2,0)
+	const struct device	*dev,
+#else
+	struct device		*dev,
+#endif
+	umode_t			*mode)
 
 	{
 	if (mode)
